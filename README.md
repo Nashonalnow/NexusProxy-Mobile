@@ -76,7 +76,19 @@ Unlike legacy desktop proxies ported awkwardly to handheld screens, NexusProxy M
 
 ### 5. On-Device CA Certificate Provisioning
 - High-entropy Root CA generator utilizing Rustls and OpenSSL cryptography.
-- Simple one-click certificate installation profile for Android User Trust Store and Apple iOS profiles.
+- Simple one-click certificate installation profile for Android User Trust Store and Apple iOS profiles (`.mobileconfig`).
+
+### 6. Extended Protocols & Wire Dissection
+- **RFC 6455 WebSocket Engine**: Decodes frame opcodes (Text, Binary, Ping, Pong, Close), masking keys, and unmasked payload streams.
+- **RFC 7540 HTTP/2 Frame Dissector**: Dissects raw frame length, type (DATA, HEADERS, SETTINGS, etc.), flags, stream IDs, and payloads.
+
+### 7. Automated OWASP MASVS Passive Security Scanner
+- Zero-interaction heuristic analysis checking in-flight HTTP/S traffic:
+  - Missing HSTS (`MASVS-NETWORK-1`)
+  - Missing CSP & X-Content-Type-Options (`MASVS-PLATFORM-2`)
+  - Sensitive tokens in URL query parameters (`MASVS-STORAGE-2`)
+  - Insecure cookies missing `Secure` or `HttpOnly` flags (`MASVS-STORAGE-2`)
+  - Server technology banner disclosures (`MASVS-RESILIENCE-1`)
 
 ---
 
@@ -100,15 +112,17 @@ NexusProxy-Mobile/
 │   └── masvs.md
 ├── core/                       # Shared Rust Core Workspace
 │   ├── Cargo.toml
-│   ├── parser/                 # RFC 7230/9110 HTTP parser
-│   ├── policy/                 # Scope validation & rate limiting
+│   ├── parser/                 # RFC 7230/9110 HTTP, RFC 6455 WS & RFC 7540 H2 parser
+│   ├── policy/                 # Scope validation, rate limiting & Passive MASVS scanner
 │   ├── tls/                    # CA generation & dynamic leaf cert forge
 │   ├── storage/                # SQLCipher database & project models
 │   ├── transport/              # TCP proxy, HTTP listener & Replay engine
-│   └── ffi/                    # C-ABI and JNI hooks for Kotlin/Swift
-├── android/                    # Native Android (Kotlin + Jetpack Compose)
+│   └── ffi/                    # C-ABI and JNI hooks for Kotlin/Swift & Python ctypes
+├── android/                    # Native Android (Kotlin + Jetpack Compose + VpnService)
 ├── ios/                        # Native iOS (Swift + NetworkExtension)
-├── workbench/                  # Interactive Local Test Workbench & API
+├── workbench/                  # Interactive Local Test Workbench & API (FastAPI + FFI)
+│   ├── api/                    # Daemon endpoints & Python ctypes native bridge
+│   └── app/                    # Mobile-responsive web UI (Cyberpunk HUD theme)
 ├── LICENSE                     # Apache 2.0
 ├── SECURITY.md                 # Vulnerability reporting & RoE boundaries
 └── README.md

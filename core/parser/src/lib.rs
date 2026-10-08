@@ -247,6 +247,182 @@ impl HttpTransaction {
     }
 }
 
+// =========================================================================
+// RFC 6455: WebSocket Frame Parser
+// =========================================================================
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum WebSocketOpcode {
+    Continuation,
+    Text,
+    Binary,
+    Close,
+    Ping,
+    Pong,
+    Reserved(u8),
+}
+
+impl From<u8> for WebSocketOpcode {
+    fn from(byte: u8) -> Self {
+        match byte & 0x0F {
+            0x0 => WebSocketOpcode::Continuation,
+            0x1 => WebSocketOpcode::Text,
+            0x2 => WebSocketOpcode::Binary,
+            0x8 => WebSocketOpcode::Close,
+            0x9 => WebSocketOpcode::Ping,
+            0xA => WebSocketOpcode::Pong,
+            other => WebSocketOpcode::Reserved(other),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WebSocketFrame {
+    pub is_final: bool,
+    pub opcode: WebSocketOpcode,
+    pub is_masked: bool,
+    pub payload: Vec<u8>,
+}
+
+impl WebSocketFrame {
+    pub fn parse(raw: &[u8]) -> Result<Self, ParserError> {
+        if raw.len() < 2 {
+            return Err(ParserError::IncompleteHeader);
+        }
+
+        let is_final = (raw[0] & 0x80) != 0;
+        let opcode = WebSocketOpcode::from(raw[0] & 0x0F);
+        let is_masked = (raw[1] & 0x80) != 0;
+        let mut payload_len = (raw[1] & 0x7F) as usize;
+
+        let mut offset = 2;
+        if payload_len == 126 {
+            if raw.len() < offset + 2 {
+                return Err(ParserError::IncompleteHeader);
+            }
+            payload_len = u16::from_be_bytes([raw[offset], raw[offset + 1]]) as usize;
+            offset += 2;
+        } else if payload_len == 127 {
+            if raw.len() < offset + 8 {
+                return Err(ParserError::IncompleteHeader);
+            }
+            payload_len = u64::from_be_bytes(raw[offset..offset + 8].try_into().unwrap()) as usize;
+            offset += 8;
+        }
+
+        let mask = if is_masked {
+            if raw.len() < offset + 4 {
+                return Err(ParserError::IncompleteHeader);
+            }
+            let key = [raw[offset], raw[offset + 1], raw[offset + 2], raw[offset + 3]];
+            offset += 4;
+            Some(key)
+        } else {
+            None
+        };
+
+        if raw.len() < offset + payload_len {
+            return Err(ParserError::IncompleteHeader);
+        }
+
+        let mut payload = raw[offset..offset + payload_len].to_vec();
+        if let Some(mask_key) = mask {
+            for (i, byte) in payload.iter_mut().enumerate() {
+                *byte ^= mask_key[i % 4];
+            }
+        }
+
+        Ok(Self {
+            is_final,
+            opcode,
+            is_masked,
+            payload,
+        })
+    }
+
+    pub fn text(&self) -> Option<&str> {
+        if self.opcode == WebSocketOpcode::Text {
+            std::str::from_utf8(&self.payload).ok()
+        } else {
+            None
+        }
+    }
+}
+
+// =========================================================================
+// RFC 7540: HTTP/2 Frame Parser
+// =========================================================================
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Http2FrameType {
+    Data,
+    Headers,
+    Priority,
+    RstStream,
+    Settings,
+    PushPromise,
+    Ping,
+    GoAway,
+    WindowUpdate,
+    Continuation,
+    Unknown(u8),
+}
+
+impl From<u8> for Http2FrameType {
+    fn from(byte: u8) -> Self {
+        match byte {
+            0x0 => Http2FrameType::Data,
+            0x1 => Http2FrameType::Headers,
+            0x2 => Http2FrameType::Priority,
+            0x3 => Http2FrameType::RstStream,
+            0x4 => Http2FrameType::Settings,
+            0x5 => Http2FrameType::PushPromise,
+            0x6 => Http2FrameType::Ping,
+            0x7 => Http2FrameType::GoAway,
+            0x8 => Http2FrameType::WindowUpdate,
+            0x9 => Http2FrameType::Continuation,
+            other => Http2FrameType::Unknown(other),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Http2Frame {
+    pub length: u32,
+    pub frame_type: Http2FrameType,
+    pub flags: u8,
+    pub stream_id: u32,
+    pub payload: Vec<u8>,
+}
+
+impl Http2Frame {
+    pub fn parse(raw: &[u8]) -> Result<Self, ParserError> {
+        if raw.len() < 9 {
+            return Err(ParserError::IncompleteHeader);
+        }
+
+        let length = ((raw[0] as u32) << 16) | ((raw[1] as u32) << 8) | (raw[2] as u32);
+        let frame_type = Http2FrameType::from(raw[3]);
+        let flags = raw[4];
+        let stream_id = u32::from_be_bytes([raw[5] & 0x7F, raw[6], raw[7], raw[8]]);
+
+        let total_needed = 9 + length as usize;
+        if raw.len() < total_needed {
+            return Err(ParserError::IncompleteHeader);
+        }
+
+        let payload = raw[9..total_needed].to_vec();
+
+        Ok(Self {
+            length,
+            frame_type,
+            flags,
+            stream_id,
+            payload,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -277,5 +453,26 @@ mod tests {
         let resp = HttpResponse::new(200, "OK");
         let tx = HttpTransaction::new(req, Some(resp));
         assert_eq!(tx.sha256_digest.len(), 64);
+    }
+
+    #[test]
+    fn test_parse_websocket_frame() {
+        // Unmasked text frame: FIN=1, Opcode=1 (Text), Len=5, Payload="Hello"
+        let raw = [0x81, 0x05, b'H', b'e', b'l', b'l', b'o'];
+        let frame = WebSocketFrame::parse(&raw).unwrap();
+        assert!(frame.is_final);
+        assert_eq!(frame.opcode, WebSocketOpcode::Text);
+        assert_eq!(frame.text(), Some("Hello"));
+    }
+
+    #[test]
+    fn test_parse_http2_frame() {
+        // HTTP/2 SETTINGS frame: Length=6, Type=0x04 (Settings), Flags=0, Stream ID=0
+        let raw = [0x00, 0x00, 0x06, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x64];
+        let frame = Http2Frame::parse(&raw).unwrap();
+        assert_eq!(frame.length, 6);
+        assert_eq!(frame.frame_type, Http2FrameType::Settings);
+        assert_eq!(frame.stream_id, 0);
+        assert_eq!(frame.payload.len(), 6);
     }
 }

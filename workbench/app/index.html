@@ -29,6 +29,8 @@
                 <button class="nav-btn" data-tab="tab-intercept">⏸️ Intercept</button>
                 <button class="nav-btn" data-tab="tab-history">📜 HTTP History</button>
                 <button class="nav-btn" data-tab="tab-repeater">🔁 Repeater</button>
+                <button class="nav-btn" data-tab="tab-passive">🛡️ Passive Audit</button>
+                <button class="nav-btn" data-tab="tab-dissector">⚡ Frame Dissector</button>
                 <button class="nav-btn" data-tab="tab-scope">🛡️ Scope Guard</button>
                 <button class="nav-btn" data-tab="tab-export">📦 Evidence Export</button>
             </div>
@@ -215,6 +217,84 @@ Content-Type: application/json</textarea>
                     <div id="exportResult" class="digest-code" style="margin-top:10px;">
                         Click "Export Evidence ZIP" to compile all captured requests, responses, and cryptographic seals.
                     </div>
+                </div>
+            </section>
+
+            <!-- TAB 7: Passive Audit -->
+            <section id="tab-passive" class="tab-pane">
+                <div class="pane-header">
+                    <div>
+                        <h2>OWASP MASVS Passive Security Audit</h2>
+                        <p class="pane-sub">Zero-interaction heuristic analysis of captured headers, tokens, and cookies via native Rust core.</p>
+                    </div>
+                    <button id="btnRunPassiveAudit" class="btn-primary">🔍 Re-Scan Traffic</button>
+                </div>
+
+                <div class="summary-cards-row">
+                    <div class="stat-card">
+                        <span class="stat-num" id="statPassiveHigh" style="color:#ef4444;">0</span>
+                        <span class="stat-lbl">High Risk</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-num" id="statPassiveMedium" style="color:#f59e0b;">0</span>
+                        <span class="stat-lbl">Medium Risk</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-num" id="statPassiveLow" style="color:#10b981;">0</span>
+                        <span class="stat-lbl">Low Risk</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-num" id="statPassiveInfo" style="color:#38bdf8;">0</span>
+                        <span class="stat-lbl">Info Disclosures</span>
+                    </div>
+                </div>
+
+                <div class="tactical-card" style="margin-top:16px;">
+                    <div class="card-header">
+                        <h3>Automated Findings Dossier</h3>
+                        <span id="passiveFindingsCountBadge" class="score-badge grade-secure">0 FINDINGS</span>
+                    </div>
+                    <div id="passiveFindingsContainer" style="margin-top:12px; display:flex; flex-direction:column; gap:12px;">
+                        <p class="pane-sub">No passive audit executed. Tap "Re-Scan Traffic" or capture transactions in HTTP History.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 8: Frame Dissector -->
+            <section id="tab-dissector" class="tab-pane">
+                <div class="pane-header">
+                    <div>
+                        <h2>RFC 6455 & RFC 7540 Protocol Dissector</h2>
+                        <p class="pane-sub">Zero-copy native frame dissection for WebSocket and HTTP/2 wire streams.</p>
+                    </div>
+                    <button id="btnDissectNow" class="btn-primary">🔬 Dissect Hex Stream</button>
+                </div>
+
+                <div class="tactical-card">
+                    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+                        <label style="font-size:0.85rem; font-weight:600; color:#cbd5e1;">Protocol:</label>
+                        <select id="dissectorProtoSelect" class="method-select" style="min-width:180px;">
+                            <option value="websocket">WebSocket (RFC 6455)</option>
+                            <option value="http2">HTTP/2 (RFC 7540)</option>
+                        </select>
+                        <div class="btn-row" style="margin-left:auto;">
+                            <button class="btn-secondary" style="font-size:0.75rem; padding:4px 8px;" id="btnPresetWsMasked">WS Masked Text</button>
+                            <button class="btn-secondary" style="font-size:0.75rem; padding:4px 8px;" id="btnPresetWsPing">WS Ping</button>
+                            <button class="btn-secondary" style="font-size:0.75rem; padding:4px 8px;" id="btnPresetH2Data">H2 Data</button>
+                            <button class="btn-secondary" style="font-size:0.75rem; padding:4px 8px;" id="btnPresetH2Settings">H2 Settings</button>
+                        </div>
+                    </div>
+
+                    <label style="font-size:0.8rem; color:#94a3b8; display:block; margin-bottom:4px;">Raw Wire Hex Stream (hex bytes):</label>
+                    <textarea id="dissectorHexInput" class="code-editor" style="height:90px;" spellcheck="false" placeholder="81 85 37 fa 21 3d 7f 9f 4d 51 58"></textarea>
+                </div>
+
+                <div class="tactical-card" style="margin-top:16px;">
+                    <div class="card-header">
+                        <h3>Dissection Results (Rust Core)</h3>
+                        <span id="dissectorResultBadge" class="score-badge">WAITING</span>
+                    </div>
+                    <pre id="dissectorOutputJson" class="code-editor response-viewer" style="margin-top:10px; max-height:280px;">Select a preset or paste hex bytes and tap "Dissect Hex Stream".</pre>
                 </div>
             </section>
 

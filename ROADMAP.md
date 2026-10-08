@@ -27,30 +27,31 @@ $$\text{WSJF} = \frac{\text{User Value} + \text{Time Criticality} + \text{Risk R
 - [x] GitHub Actions automated CI workflows.
 
 ### Phase 1: Core Interception & Traffic History
-- [ ] Implement RFC 9110 compliant HTTP/1.1 request & response streaming parser.
-- [ ] Build in-memory & SQLite-backed persistent traffic history store with SHA-256 digests.
-- [ ] Implement Scope Policy Engine with wildcard domain matching (`*.example.com`).
-- [ ] Add auto-redaction rules for sensitive headers (`Authorization`, `Cookie`, `X-Api-Key`).
+- [x] Implement RFC 9110 compliant HTTP/1.1 request & response parser.
+- [x] Build in-memory & SQLite-backed persistent traffic history store with SHA-256 digests.
+- [x] Implement Scope Policy Engine with wildcard domain matching (`*.example.com`).
+- [x] Add auto-redaction rules for sensitive headers (`Authorization`, `Cookie`, `X-Api-Key`).
 
 ### Phase 2: Repeater & Request Mutation
-- [ ] Build high-velocity request replay engine with configurable timeout and retry logic.
-- [ ] Implement split-pane request/response visualizer with syntax highlighting.
+- [x] Build high-velocity request replay engine with configurable timeout and retry logic.
+- [x] Implement split-pane request/response visualizer with syntax highlighting.
 - [ ] Add side-by-side response diff comparator.
-- [ ] Implement automated Content-Length and Host header synchronization.
+- [x] Implement automated Content-Length and Host header synchronization.
 
 ### Phase 3: Android & iOS Platform Integration
-- [ ] Android `VpnService` implementation capturing local device loopback traffic.
-- [ ] On-device dynamic Root CA generation with `.crt` export and Android user cert installer.
-- [ ] iOS `PacketTunnelProvider` extension with local SOCKS5/HTTP redirector.
+- [x] Android `VpnService` implementation capturing local device loopback traffic with per-app scoping.
+- [x] On-device dynamic Root CA generation with `.crt` export and Android user cert installer.
+- [x] iOS `PacketTunnelProvider` extension with local loopback settings and `.mobileconfig` trust profile.
 - [ ] Integration with Android Keystore and iOS Keychain for project database encryption.
 
 ### Phase 4: Extended Protocols & Specialized Tools
-- [ ] WebSocket frame interception, opcode decoding (text, binary, ping/pong), and re-assembly.
-- [ ] HTTP/2 stream multiplexing and HPACK header decompression.
+- [x] WebSocket frame interception, opcode decoding (text, binary, ping/pong), and payload unmasking (RFC 6455).
+- [x] HTTP/2 frame dissection (Length, Type, Flags, Stream ID) (RFC 7540).
 - [ ] Interactive JWT token decoder and signature verification inspector.
 - [ ] GraphQL query and mutation beautifier and introspection analyzer.
 
 ### Phase 5: Forensics, Export & Copilot Integration
-- [ ] Single-click Evidence Dossier export (`engagement.zip` with SHA-256 cryptographic manifest).
-- [ ] Real-time telemetry feed to Mobile Pentest Copilot for automated passive vulnerability analysis.
+- [x] Single-click Evidence Dossier export (`engagement.zip` with SHA-256 cryptographic manifest).
+- [x] Real-time telemetry feed to Mobile Pentest Copilot for automated passive vulnerability analysis.
+- [x] Passive Security Scanner mapping to OWASP MASVS v2 (HSTS, CSP, Cookies, Leaks).
 - [ ] Integration with NetVanguard and PortSentinel suites for unified mobile defense.

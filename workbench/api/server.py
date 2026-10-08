@@ -15,9 +15,18 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 from typing import Dict, List, Any, Optional
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+# Import Rust Native Core FFI Bridge
+try:
+    from nexus_core import native_core
+except ImportError:
+    try:
+        from workbench.api.nexus_core import native_core
+    except Exception:
+        native_core = None
 
 from fastapi import FastAPI, HTTPException, Body, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,7 +37,7 @@ from pydantic import BaseModel
 app = FastAPI(
     title="NexusProxy Mobile™ Workbench",
     description="Mobile-Native Web Security Testing & Traffic Interception Core",
-    version="0.1.0"
+    version="0.2.0"
 )
 
 app.add_middleware(
@@ -96,14 +105,17 @@ class ReplayRequest(BaseModel):
 
 @app.get("/api/status")
 def get_status():
+    ca_fp = native_core.get_ca_fingerprint() if native_core else "UNAVAILABLE"
     return {
         "status": "OPERATIONAL" if proxy_state["is_running"] else "STOPPED",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "listen_port": proxy_state["listen_port"],
         "intercept_enabled": proxy_state["intercept_enabled"],
         "total_captured": len(traffic_history),
         "pending_intercepts": len(intercept_queue),
-        "scope": proxy_state["scope_allowlist"]
+        "scope": proxy_state["scope_allowlist"],
+        "ca_fingerprint": ca_fp,
+        "native_core_loaded": bool(native_core and native_core.lib is not None),
     }
 
 @app.post("/api/proxy/toggle")
@@ -285,19 +297,13 @@ def export_evidence_bundle():
         "sha256": hashlib.sha256(bundle_path.read_bytes()).hexdigest()
     }
 
-# CA Download Endpoints
+# CA Download Endpoints (Dynamically generated via Rust rcgen Core)
 @app.get("/api/ca/download")
 def download_ca(format: str = Query("crt", pattern="^(crt|mobileconfig|pem)$")):
-    ca_cert = (
-        "-----BEGIN CERTIFICATE-----\n"
-        "MIIB/zCCAaWgAwIBAgIUKTAxNexusProxyRootCA==\n"
-        "CN: NexusProxy Root CA\n"
-        "O: NexusProxy Mobile Security\n"
-        "Validity: 2026-10-08 to 2029-10-08\n"
-        "-----END CERTIFICATE-----\n"
-    )
     if format == "mobileconfig":
-        content = f"""<?xml version="1.0" encoding="UTF-8"?>
+        content = native_core.export_mobileconfig() if native_core else ""
+        if not content:
+            content = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -313,8 +319,102 @@ def download_ca(format: str = Query("crt", pattern="^(crt|mobileconfig|pem)$")):
     <integer>1</integer>
 </dict>
 </plist>"""
-        return JSONResponse(content={"profile": content}, headers={"Content-Disposition": "attachment; filename=nexusproxy-ca.mobileconfig"})
-    return JSONResponse(content={"certificate": ca_cert}, headers={"Content-Disposition": "attachment; filename=nexusproxy-ca.crt"})
+        return JSONResponse(
+            content={"profile": content},
+            headers={"Content-Disposition": "attachment; filename=nexusproxy-ca.mobileconfig"}
+        )
+
+    pem = native_core.export_ca_pem() if native_core else ""
+    if not pem:
+        pem = (
+            "-----BEGIN CERTIFICATE-----\n"
+            "MIIB/zCCAaWgAwIBAgIUKTAxNexusProxyRootCA==\n"
+            "CN: NexusProxy Root CA\n"
+            "O: NexusProxy Mobile Security\n"
+            "Validity: 2026-10-08 to 2029-10-08\n"
+            "-----END CERTIFICATE-----\n"
+        )
+    return JSONResponse(
+        content={"certificate": pem},
+        headers={"Content-Disposition": "attachment; filename=nexusproxy-ca.crt"}
+    )
+
+# Passive Security Analysis (OWASP MASVS Heuristics via Rust Engine)
+@app.get("/api/audit/passive")
+def get_passive_findings(transaction_id: Optional[str] = None):
+    all_findings = []
+    targets = traffic_history
+    if transaction_id:
+        targets = [t for t in traffic_history if t["id"] == transaction_id]
+
+    for t in targets:
+        headers_req = {}
+        for line in t.get("request_raw", "").split("\n"):
+            if ":" in line:
+                k, v = line.split(":", 1)
+                headers_req[k.strip()] = v.strip()
+
+        headers_resp = {}
+        for line in t.get("response_raw", "").split("\n"):
+            if ":" in line:
+                k, v = line.split(":", 1)
+                headers_resp[k.strip()] = v.strip()
+
+        req_dict = {
+            "id": t["id"],
+            "method": t["method"],
+            "host": t["host"],
+            "port": t.get("port", 443),
+            "path": t.get("path", "/"),
+            "headers": headers_req,
+            "body": ""
+        }
+        resp_dict = {
+            "status_code": t.get("status_code", 200),
+            "headers": headers_resp,
+            "body": "",
+            "latency_ms": t.get("latency_ms", 10)
+        }
+
+        if native_core:
+            findings = native_core.audit_transaction(req_dict, resp_dict)
+            all_findings.extend(findings)
+
+    return {
+        "status": "SUCCESS",
+        "total_findings": len(all_findings),
+        "findings": all_findings
+    }
+
+# RFC 6455 & RFC 7540 Protocol Dissection Engine
+class DissectFrameRequest(BaseModel):
+    frame_type: str  # "websocket" or "http2"
+    raw_hex: str
+
+@app.post("/api/dissect/frame")
+def dissect_frame(req: DissectFrameRequest):
+    try:
+        clean_hex = req.raw_hex.replace(" ", "").replace("0x", "").replace("\n", "").strip()
+        raw_bytes = bytes.fromhex(clean_hex)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid hex byte stream: {e}")
+
+    if not native_core:
+        raise HTTPException(status_code=503, detail="Native core dissection library offline")
+
+    if req.frame_type.lower() == "websocket":
+        result = native_core.dissect_websocket_frame(raw_bytes)
+    elif req.frame_type.lower() == "http2":
+        result = native_core.dissect_http2_frame(raw_bytes)
+    else:
+        raise HTTPException(status_code=400, detail="Unknown frame_type. Use 'websocket' or 'http2'.")
+
+    return {
+        "status": "SUCCESS",
+        "frame_type": req.frame_type,
+        "byte_count": len(raw_bytes),
+        "result": result
+    }
 
 # Mount static frontend
 WORKBENCH_DIR = Path(__file__).resolve().parent.parent

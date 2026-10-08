@@ -185,6 +185,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 responseLatencyPill.textContent = `${data.latency_ms} ms`;
                 repeaterResponseText.textContent = data.raw_response;
                 loadHistory();
+                loadPassiveAudit();
             } else {
                 responseStatusPill.textContent = "ERROR";
                 repeaterResponseText.textContent = `Error: ${data.error || 'Failed to dispatch request'}`;
@@ -338,7 +339,178 @@ document.addEventListener("DOMContentLoaded", () => {
         return String(str).replace(/'/g, "\\'").replace(/\n/g, "\\n").replace(/\r/g, "");
     }
 
+    // 9. Passive Security Audit Logic
+    const btnRunPassiveAudit = document.getElementById("btnRunPassiveAudit");
+    const statPassiveHigh = document.getElementById("statPassiveHigh");
+    const statPassiveMedium = document.getElementById("statPassiveMedium");
+    const statPassiveLow = document.getElementById("statPassiveLow");
+    const statPassiveInfo = document.getElementById("statPassiveInfo");
+    const passiveFindingsCountBadge = document.getElementById("passiveFindingsCountBadge");
+    const passiveFindingsContainer = document.getElementById("passiveFindingsContainer");
+
+    async function loadPassiveAudit() {
+        if (!passiveFindingsContainer) return;
+        try {
+            const res = await fetch("/api/audit/passive");
+            const data = await res.json();
+            const findings = data.findings || [];
+
+            let high = 0, med = 0, low = 0, info = 0;
+            findings.forEach(f => {
+                const s = (f.severity || "").toLowerCase();
+                if (s === "high") high++;
+                else if (s === "medium") med++;
+                else if (s === "low") low++;
+                else info++;
+            });
+
+            if (statPassiveHigh) statPassiveHigh.textContent = high;
+            if (statPassiveMedium) statPassiveMedium.textContent = med;
+            if (statPassiveLow) statPassiveLow.textContent = low;
+            if (statPassiveInfo) statPassiveInfo.textContent = info;
+            if (passiveFindingsCountBadge) {
+                passiveFindingsCountBadge.textContent = `${findings.length} FINDINGS`;
+                passiveFindingsCountBadge.className = high > 0 ? "score-badge" : "score-badge grade-secure";
+                if (high > 0) {
+                    passiveFindingsCountBadge.style.background = "rgba(239, 68, 68, 0.2)";
+                    passiveFindingsCountBadge.style.color = "#ef4444";
+                }
+            }
+
+            if (findings.length === 0) {
+                passiveFindingsContainer.innerHTML = `<p class="pane-sub" style="padding:16px; text-align:center;">No vulnerabilities detected across analyzed transactions. Scope is clean.</p>`;
+                return;
+            }
+
+            passiveFindingsContainer.innerHTML = findings.map(f => {
+                const sev = (f.severity || "info").toLowerCase();
+                return `
+                    <div class="finding-card severity-${sev}">
+                        <div class="finding-header">
+                            <span class="finding-title">${escapeHtml(f.title)}</span>
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                <span class="finding-tag tag-${sev}">${f.severity.toUpperCase()}</span>
+                                <span class="badge-version">${escapeHtml(f.masvs_id || 'MASVS')}</span>
+                            </div>
+                        </div>
+                        <p class="finding-desc">${escapeHtml(f.description)}</p>
+                        <div class="finding-remediation"><strong>Remediation:</strong> ${escapeHtml(f.remediation)}</div>
+                        <div class="finding-evidence"><code>Evidence: ${escapeHtml(f.evidence)}</code></div>
+                    </div>
+                `;
+            }).join("");
+        } catch (e) {
+            console.warn("Passive audit error:", e);
+        }
+    }
+
+    if (btnRunPassiveAudit) {
+        btnRunPassiveAudit.addEventListener("click", () => {
+            btnRunPassiveAudit.textContent = "Scanning...";
+            loadPassiveAudit().finally(() => {
+                btnRunPassiveAudit.textContent = "🔍 Re-Scan Traffic";
+            });
+        });
+    }
+
+    // 10. Frame Dissector Logic
+    const dissectorProtoSelect = document.getElementById("dissectorProtoSelect");
+    const dissectorHexInput = document.getElementById("dissectorHexInput");
+    const btnDissectNow = document.getElementById("btnDissectNow");
+    const dissectorResultBadge = document.getElementById("dissectorResultBadge");
+    const dissectorOutputJson = document.getElementById("dissectorOutputJson");
+
+    const btnPresetWsMasked = document.getElementById("btnPresetWsMasked");
+    const btnPresetWsPing = document.getElementById("btnPresetWsPing");
+    const btnPresetH2Data = document.getElementById("btnPresetH2Data");
+    const btnPresetH2Settings = document.getElementById("btnPresetH2Settings");
+
+    if (btnPresetWsMasked) {
+        btnPresetWsMasked.addEventListener("click", () => {
+            dissectorProtoSelect.value = "websocket";
+            dissectorHexInput.value = "81 85 37 fa 21 3d 7f 9f 4d 51 58";
+        });
+    }
+
+    if (btnPresetWsPing) {
+        btnPresetWsPing.addEventListener("click", () => {
+            dissectorProtoSelect.value = "websocket";
+            dissectorHexInput.value = "89 05 70 69 6e 67 21";
+        });
+    }
+
+    if (btnPresetH2Data) {
+        btnPresetH2Data.addEventListener("click", () => {
+            dissectorProtoSelect.value = "http2";
+            dissectorHexInput.value = "00 00 04 00 01 00 00 00 01 74 65 73 74";
+        });
+    }
+
+    if (btnPresetH2Settings) {
+        btnPresetH2Settings.addEventListener("click", () => {
+            dissectorProtoSelect.value = "http2";
+            dissectorHexInput.value = "00 00 06 04 00 00 00 00 00 00 03 00 00 00 64";
+        });
+    }
+
+    if (btnDissectNow) {
+        btnDissectNow.addEventListener("click", async () => {
+            const proto = dissectorProtoSelect.value;
+            const hex = dissectorHexInput.value.trim();
+            if (!hex) {
+                alert("Please paste or select a raw hex frame first.");
+                return;
+            }
+
+            btnDissectNow.disabled = true;
+            btnDissectNow.textContent = "Dissecting...";
+            dissectorResultBadge.textContent = "PROCESSING";
+
+            try {
+                const res = await fetch("/api/dissect/frame", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ frame_type: proto, raw_hex: hex })
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    dissectorResultBadge.textContent = "DISSECTED";
+                    dissectorResultBadge.className = "score-badge grade-secure";
+                    dissectorOutputJson.textContent = JSON.stringify(data.result, null, 2);
+                } else {
+                    dissectorResultBadge.textContent = "ERROR";
+                    dissectorResultBadge.className = "score-badge";
+                    dissectorResultBadge.style.color = "#ef4444";
+                    dissectorOutputJson.textContent = JSON.stringify(data, null, 2);
+                }
+            } catch (e) {
+                dissectorResultBadge.textContent = "NETWORK ERROR";
+                dissectorOutputJson.textContent = e.message;
+            } finally {
+                btnDissectNow.disabled = false;
+                btnDissectNow.textContent = "🔬 Dissect Hex Stream";
+            }
+        });
+    }
+
+    // Connect CA download buttons
+    const btnDownloadCaCrt = document.getElementById("btnDownloadCaCrt");
+    const btnDownloadIosProfile = document.getElementById("btnDownloadIosProfile");
+    if (btnDownloadCaCrt) {
+        btnDownloadCaCrt.addEventListener("click", () => {
+            window.location.href = "/api/ca/download?format=crt";
+        });
+    }
+    if (btnDownloadIosProfile) {
+        btnDownloadIosProfile.addEventListener("click", () => {
+            window.location.href = "/api/ca/download?format=mobileconfig";
+        });
+    }
+
     // Initial load
     loadHistory();
     loadScope();
+    loadPassiveAudit();
 });
+

@@ -1,6 +1,9 @@
 //! NexusProxy Mobile: Scope Enforcement, Redaction & Safety Guard Engine
 //! Enforces lawful authorized assessment boundaries and protects against out-of-scope leakage.
 
+pub mod passive;
+pub use passive::{FindingSeverity, PassiveFinding, PassiveScanner};
+
 use nexusproxy_parser::HttpRequest;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

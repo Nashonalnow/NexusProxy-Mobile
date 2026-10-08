@@ -633,3 +633,82 @@ body {
     color: #f8fafc;
     outline: none;
 }
+
+/* Findings Card & Badges */
+.finding-card {
+    background: #0d1422;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.finding-card.severity-high {
+    border-left: 4px solid var(--accent-crimson);
+}
+
+.finding-card.severity-medium {
+    border-left: 4px solid var(--accent-amber);
+}
+
+.finding-card.severity-low {
+    border-left: 4px solid var(--accent-emerald);
+}
+
+.finding-card.severity-info {
+    border-left: 4px solid var(--accent-cyan);
+}
+
+.finding-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.finding-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #f8fafc;
+}
+
+.finding-tag {
+    font-size: 0.72rem;
+    font-family: monospace;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 700;
+}
+
+.tag-high { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.tag-medium { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+.tag-low { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+.tag-info { background: rgba(56, 189, 248, 0.2); color: #38bdf8; }
+
+.finding-desc {
+    font-size: 0.85rem;
+    color: #cbd5e1;
+    line-height: 1.4;
+}
+
+.finding-remediation {
+    font-size: 0.82rem;
+    color: #94a3b8;
+    background: #080d16;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border-left: 2px solid var(--accent-emerald);
+}
+
+.finding-evidence {
+    font-size: 0.78rem;
+    font-family: monospace;
+    color: var(--accent-cyan);
+    background: #050911;
+    padding: 6px 10px;
+    border-radius: 4px;
+    overflow-x: auto;
+}
+

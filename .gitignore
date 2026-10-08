@@ -79,3 +79,9 @@ coverage/
 *.pcap
 *.pcapng
 *.har
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+

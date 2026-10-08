@@ -285,9 +285,50 @@ def export_evidence_bundle():
         "sha256": hashlib.sha256(bundle_path.read_bytes()).hexdigest()
     }
 
+# CA Download Endpoints
+@app.get("/api/ca/download")
+def download_ca(format: str = Query("crt", pattern="^(crt|mobileconfig|pem)$")):
+    ca_cert = (
+        "-----BEGIN CERTIFICATE-----\n"
+        "MIIB/zCCAaWgAwIBAgIUKTAxNexusProxyRootCA==\n"
+        "CN: NexusProxy Root CA\n"
+        "O: NexusProxy Mobile Security\n"
+        "Validity: 2026-10-08 to 2029-10-08\n"
+        "-----END CERTIFICATE-----\n"
+    )
+    if format == "mobileconfig":
+        content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>PayloadDisplayName</key>
+    <string>NexusProxy Testing Root CA</string>
+    <key>PayloadIdentifier</key>
+    <string>com.nexusproxy.mobile.ca</string>
+    <key>PayloadType</key>
+    <string>Configuration</string>
+    <key>PayloadUUID</key>
+    <string>4A27B08C-F51D-4C9D-98C3-289196E752F3</string>
+    <key>PayloadVersion</key>
+    <integer>1</integer>
+</dict>
+</plist>"""
+        return JSONResponse(content={"profile": content}, headers={"Content-Disposition": "attachment; filename=nexusproxy-ca.mobileconfig"})
+    return JSONResponse(content={"certificate": ca_cert}, headers={"Content-Disposition": "attachment; filename=nexusproxy-ca.crt"})
+
 # Mount static frontend
-APP_DIR = PROJECT_ROOT / "workbench" / "app"
+WORKBENCH_DIR = Path(__file__).resolve().parent.parent
+APP_DIR = WORKBENCH_DIR / "app"
+
+@app.get("/")
+def serve_index():
+    index_file = APP_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file))
+    raise HTTPException(status_code=404, detail="Index not found")
+
 if APP_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(APP_DIR)), name="static_dir")
     app.mount("/", StaticFiles(directory=str(APP_DIR), html=True), name="static")
 
 if __name__ == "__main__":

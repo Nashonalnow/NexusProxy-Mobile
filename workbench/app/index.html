@@ -49,17 +49,31 @@
                 </div>
 
                 <div class="summary-cards-row">
-                    <div class="stat-card">
-                        <span class="stat-num" id="statCaptured">2</span>
+                    <div class="stat-card interactive-stat-card" id="cardCapturedRequests" title="Click to inspect live captured traffic breakdown">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                            <span class="stat-num" id="statCaptured">2</span>
+                            <span class="stat-icon-badge">📊</span>
+                        </div>
                         <span class="stat-lbl">Captured Requests</span>
+                        <span class="stat-action-hint">🔍 View Traffic Breakdown →</span>
                     </div>
-                    <div class="stat-card">
-                        <span class="stat-num" id="statListenPort">8085</span>
+
+                    <div class="stat-card interactive-stat-card" id="cardProxyPort" title="Click to configure proxy listener port and socket bindings">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                            <span class="stat-num" id="statListenPort">8085</span>
+                            <span class="stat-icon-badge">⚙️</span>
+                        </div>
                         <span class="stat-lbl">Proxy Port</span>
+                        <span class="stat-action-hint" style="color:var(--accent-cyan);">⚙️ Configure Listener Socket →</span>
                     </div>
-                    <div class="stat-card">
-                        <span class="stat-num" id="statScopeCount">3</span>
+
+                    <div class="stat-card interactive-stat-card" id="cardScopeDomains" title="Click to inspect in-scope domains and test security boundaries">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                            <span class="stat-num" id="statScopeCount">3</span>
+                            <span class="stat-icon-badge">🛡️</span>
+                        </div>
                         <span class="stat-lbl">In-Scope Domains</span>
+                        <span class="stat-action-hint" style="color:var(--accent-amber);">🛡️ Test & Manage Scope →</span>
                     </div>
                 </div>
 
@@ -70,17 +84,26 @@
                     <div class="btn-grid">
                         <button class="btn-quick" onclick="switchTab('tab-repeater')">🔁 Open Repeater</button>
                         <button class="btn-quick" onclick="switchTab('tab-history')">📜 Inspect HTTP History</button>
+                        <button class="btn-quick" onclick="switchTab('tab-passive')">🛡️ Run Passive Audit</button>
+                        <button class="btn-quick" onclick="switchTab('tab-dissector')">⚡ Dissect Wire Frame</button>
                         <button class="btn-quick" onclick="switchTab('tab-scope')">🛡️ Configure Target Scope</button>
                         <button class="btn-quick" onclick="switchTab('tab-export')">📦 Export Evidence ZIP</button>
                     </div>
                 </div>
 
-                <div class="tactical-card" style="margin-top:16px;">
+                <div class="tactical-card interactive-ca-card" id="cardRootCa" style="margin-top:16px;">
                     <div class="card-header">
                         <h3>Testing Root CA Onboarding</h3>
-                        <span class="score-badge grade-secure">ACTIVE</span>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <button class="btn-secondary" style="font-size:0.75rem; padding:4px 10px;" id="btnOpenCaModal">🔍 Inspect Certificate & Guide</button>
+                            <span class="score-badge grade-secure">ACTIVE</span>
+                        </div>
                     </div>
                     <p class="pane-sub">Install the testing Root CA into Android User Credentials or iOS Configuration Profile.</p>
+                    <div style="margin-top:8px; font-family:monospace; font-size:0.75rem; color:#94a3b8; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                        <span>SHA-256 Fingerprint:</span>
+                        <code id="dashboardCaFingerprint" style="color:#00d2ff; background:#080d16; padding:2px 6px; border-radius:4px; max-width:100%; word-break:break-all;">Loading...</code>
+                    </div>
                     <div class="btn-row" style="margin-top:12px;">
                         <button class="btn-secondary" id="btnDownloadCaCrt">📥 Download Android CA (.crt)</button>
                         <button class="btn-secondary" id="btnDownloadIosProfile">📱 Download iOS Profile (.mobileconfig)</button>
@@ -343,6 +366,250 @@ Content-Type: application/json</textarea>
             <button id="btnSendCopilot" class="btn-primary">Send</button>
         </div>
     </aside>
+
+    <!-- MODAL 1: Captured Traffic Inspector -->
+    <div id="modalCapturedTraffic" class="tactical-modal hidden">
+        <div class="modal-backdrop" onclick="closeAllModals()"></div>
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title">📊 Captured Traffic & Scope Inspector</h3>
+                    <p class="pane-sub">Empirical traffic telemetry, method distribution, and scope validation.</p>
+                </div>
+                <button class="modal-close-btn" onclick="closeAllModals()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="summary-cards-row" style="margin-bottom:14px;">
+                    <div class="stat-card" style="padding:10px 14px;">
+                        <span class="stat-num" id="modalTrafficTotal" style="font-size:1.4rem;">0</span>
+                        <span class="stat-lbl">Total Requests</span>
+                    </div>
+                    <div class="stat-card" style="padding:10px 14px;">
+                        <span class="stat-num" id="modalTrafficAvgLatency" style="font-size:1.4rem; color:var(--accent-cyan);">0 ms</span>
+                        <span class="stat-lbl">Avg Latency</span>
+                    </div>
+                    <div class="stat-card" style="padding:10px 14px;">
+                        <span class="stat-num" id="modalTrafficSuccess" style="font-size:1.4rem; color:var(--accent-emerald);">0</span>
+                        <span class="stat-lbl">2xx Success</span>
+                    </div>
+                    <div class="stat-card" style="padding:10px 14px;">
+                        <span class="stat-num" id="modalTrafficErrors" style="font-size:1.4rem; color:var(--accent-crimson);">0</span>
+                        <span class="stat-lbl">4xx/5xx Errors</span>
+                    </div>
+                </div>
+
+                <div class="tactical-card" style="padding:12px; margin-bottom:12px;">
+                    <div class="card-header" style="margin-bottom:8px;">
+                        <span style="font-size:0.85rem; font-weight:700;">Protocol Methods & Top Hosts</span>
+                    </div>
+                    <div id="modalTrafficMethodsRow" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
+                        <!-- Dynamic method badges -->
+                    </div>
+                    <div id="modalTrafficHostsRow" style="font-size:0.8rem; color:#94a3b8; font-family:monospace;">
+                        <!-- Top hosts list -->
+                    </div>
+                </div>
+
+                <div class="tactical-card" style="padding:12px;">
+                    <div class="card-header" style="margin-bottom:8px;">
+                        <span style="font-size:0.85rem; font-weight:700;">Recent Intercepted Transactions</span>
+                        <span class="badge-version">LATEST 6</span>
+                    </div>
+                    <div id="modalTrafficRecentList" style="display:flex; flex-direction:column; gap:6px; max-height:220px; overflow-y:auto;">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" onclick="switchTab('tab-history'); closeAllModals();">📜 Open Full HTTP History</button>
+                <button class="btn-secondary" onclick="switchTab('tab-passive'); closeAllModals();">🛡️ Run Passive Audit</button>
+                <button class="btn-secondary" onclick="closeAllModals()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Proxy Socket & Port Configuration -->
+    <div id="modalProxySocket" class="tactical-modal hidden">
+        <div class="modal-backdrop" onclick="closeAllModals()"></div>
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title">⚙️ Proxy Socket & Listener Configuration</h3>
+                    <p class="pane-sub">Manage local loopback socket, port binding, and L3/L7 routing rules.</p>
+                </div>
+                <button class="modal-close-btn" onclick="closeAllModals()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="tactical-card" style="padding:14px; margin-bottom:12px;">
+                    <div class="card-header" style="margin-bottom:8px;">
+                        <span style="font-weight:700; font-size:0.9rem;">Listener Socket State</span>
+                        <span id="modalProxyStateBadge" class="score-badge grade-secure">RUNNING</span>
+                    </div>
+                    <div class="btn-row" style="gap:10px;">
+                        <button id="modalBtnToggleProxy" class="btn-primary" style="flex:1;">Pause Proxy Listener</button>
+                        <button id="modalBtnToggleIntercept" class="btn-secondary" style="flex:1;">Intercept: OFF</button>
+                    </div>
+                </div>
+
+                <div class="tactical-card" style="padding:14px; margin-bottom:12px;">
+                    <div class="card-header" style="margin-bottom:8px;">
+                        <span style="font-weight:700; font-size:0.9rem;">Listener Port & Rate Limiter</span>
+                    </div>
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <div style="flex:1; min-width:140px;">
+                            <label style="font-size:0.75rem; color:#94a3b8; display:block; margin-bottom:4px;">TCP Listen Port:</label>
+                            <input type="number" id="modalProxyPortInput" min="1024" max="65535" value="8085" class="url-input" style="width:100%;" />
+                        </div>
+                        <div style="flex:1; min-width:140px;">
+                            <label style="font-size:0.75rem; color:#94a3b8; display:block; margin-bottom:4px;">Max Rate Limit (RPM):</label>
+                            <input type="number" id="modalProxyRpmInput" min="1" max="1000" value="60" class="url-input" style="width:100%;" />
+                        </div>
+                        <button id="modalBtnSaveProxyConfig" class="btn-primary" style="align-self:flex-end;">Save & Apply</button>
+                    </div>
+                </div>
+
+                <div class="tactical-card" style="padding:14px;">
+                    <div class="card-header" style="margin-bottom:6px;">
+                        <span style="font-weight:700; font-size:0.85rem;">Interface Binding & Security Safeguards</span>
+                    </div>
+                    <ul style="font-size:0.8rem; color:#cbd5e1; list-style:none; display:flex; flex-direction:column; gap:4px; padding-left:0;">
+                        <li>🌐 <strong>Bind Address:</strong> <code>0.0.0.0 (All local interfaces)</code></li>
+                        <li>🛡️ <strong>Loopback Self-Exclusion:</strong> <span style="color:#00f59b;">Active</span> (App packages self-quarantined from interception)</li>
+                        <li>📱 <strong>Android TUN Interface:</strong> <code>10.0.0.2 / 24</code> (MTU 1500)</li>
+                        <li>🍏 <strong>iOS NetworkExtension:</strong> <code>10.0.0.3 / 24</code> (PacketTunnelProvider)</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeAllModals()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: Target Scope Guard & Domain Boundaries -->
+    <div id="modalScopeGuard" class="tactical-modal hidden">
+        <div class="modal-backdrop" onclick="closeAllModals()"></div>
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title">🛡️ Security Scope Guard & Domain Boundaries</h3>
+                    <p class="pane-sub">Enforces strict RoE assessment boundaries and tests endpoint legality.</p>
+                </div>
+                <button class="modal-close-btn" onclick="closeAllModals()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="tactical-card" style="padding:14px; margin-bottom:12px;">
+                    <div class="card-header" style="margin-bottom:8px;">
+                        <span style="font-weight:700; font-size:0.9rem;">⚡ Live Endpoint Scope Tester</span>
+                        <span class="badge-version">RUST POLICY CORE</span>
+                    </div>
+                    <p class="pane-sub" style="margin-bottom:8px;">Test if a target host or API endpoint is within your authorized security testing scope.</p>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="modalScopeTestInput" class="url-input" placeholder="e.g. api.target.com or auth.google.com" style="flex:1;" />
+                        <button id="modalBtnTestScope" class="btn-primary">⚡ Test Domain</button>
+                    </div>
+                    <div id="modalScopeTestResult" style="margin-top:10px; display:none; padding:10px 12px; border-radius:8px; font-size:0.85rem; font-family:monospace;">
+                        <!-- Test result -->
+                    </div>
+                </div>
+
+                <div class="tactical-card" style="padding:14px; margin-bottom:12px;">
+                    <div class="card-header" style="margin-bottom:8px;">
+                        <span style="font-weight:700; font-size:0.9rem;">Active Allowlist Domains</span>
+                        <span id="modalScopeAllowCountBadge" class="score-badge grade-secure">0 IN-SCOPE</span>
+                    </div>
+                    <div id="modalScopeAllowlistChips" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+                        <!-- Allowlist chips -->
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="modalScopeAddDomainInput" class="url-input" placeholder="Add domain (e.g. *.corp.com)" style="flex:1;" />
+                        <button id="modalBtnAddDomain" class="btn-secondary">+ Add Domain</button>
+                    </div>
+                </div>
+
+                <div class="tactical-card" style="padding:14px;">
+                    <div class="card-header" style="margin-bottom:6px;">
+                        <span style="font-weight:700; font-size:0.9rem;">Excluded Denylist Domains</span>
+                    </div>
+                    <div id="modalScopeDenylistChips" style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <!-- Denylist chips -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" onclick="switchTab('tab-scope'); closeAllModals();">🛡️ Open Full Scope Guard Tab</button>
+                <button class="btn-secondary" onclick="closeAllModals()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 4: Root CA Inspector & Device Onboarding Guide -->
+    <div id="modalCaCertificate" class="tactical-modal hidden">
+        <div class="modal-backdrop" onclick="closeAllModals()"></div>
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title">🔒 Root CA Certificate & Device Onboarding</h3>
+                    <p class="pane-sub">Cryptographic root authority parameters and mobile trust store installation.</p>
+                </div>
+                <button class="modal-close-btn" onclick="closeAllModals()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="tactical-card" style="padding:14px; margin-bottom:12px;">
+                    <div class="card-header" style="margin-bottom:8px;">
+                        <span style="font-weight:700; font-size:0.9rem;">Root CA Identity & Fingerprint</span>
+                        <span class="score-badge grade-secure">AUTHENTIC</span>
+                    </div>
+                    <div style="font-size:0.8rem; color:#cbd5e1; display:flex; flex-direction:column; gap:4px;">
+                        <div><strong>Subject / CN:</strong> <code>NexusProxy Root CA</code></div>
+                        <div><strong>Organization:</strong> <code>NexusProxy Security</code></div>
+                        <div><strong>Validity:</strong> <code>3 Years (Dynamic Local Authority)</code></div>
+                        <div style="margin-top:4px;">
+                            <strong>SHA-256 Fingerprint:</strong>
+                            <div style="display:flex; gap:6px; align-items:center; margin-top:2px;">
+                                <code id="modalCaFingerprintFull" style="color:#00d2ff; background:#080d16; padding:4px 8px; border-radius:4px; font-size:0.75rem; word-break:break-all; flex:1;">Loading...</code>
+                                <button id="modalBtnCopyFp" class="btn-secondary" style="padding:4px 8px; font-size:0.72rem;">📋 Copy</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tactical-card" style="padding:14px; margin-bottom:12px;">
+                    <div class="card-header" style="margin-bottom:8px;">
+                        <span style="font-weight:700; font-size:0.9rem;">Mobile Trust Store Installation Guide</span>
+                    </div>
+                    <div style="display:flex; gap:8px; margin-bottom:10px;">
+                        <button class="btn-secondary active" id="modalBtnTabAndroidGuide" style="flex:1; font-size:0.78rem;">🤖 Android Guide</button>
+                        <button class="btn-secondary" id="modalBtnTabIosGuide" style="flex:1; font-size:0.78rem;">🍏 iOS Guide</button>
+                    </div>
+                    <div id="modalGuideAndroid" style="font-size:0.8rem; color:#cbd5e1; line-height:1.4;">
+                        <ol style="padding-left:18px;">
+                            <li>Download the <code>.crt</code> certificate using the button below.</li>
+                            <li>Open Android <strong>Settings ➔ Security & Privacy ➔ More Security Settings</strong>.</li>
+                            <li>Tap <strong>Encryption & Credentials ➔ Install a Certificate ➔ CA Certificate</strong>.</li>
+                            <li>Select the downloaded <code>nexusproxy-ca.crt</code> and tap <strong>Install Anyway</strong>.</li>
+                        </ol>
+                    </div>
+                    <div id="modalGuideIos" style="font-size:0.8rem; color:#cbd5e1; line-height:1.4; display:none;">
+                        <ol style="padding-left:18px;">
+                            <li>Download the <code>.mobileconfig</code> profile below in Safari.</li>
+                            <li>Go to <strong>Settings ➔ Profile Downloaded ➔ Install</strong>.</li>
+                            <li>Go to <strong>Settings ➔ General ➔ About ➔ Certificate Trust Settings</strong>.</li>
+                            <li>Under "Enable full trust for root certificates", toggle <strong>NexusProxy Testing Root CA</strong> ON.</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="btn-row" style="gap:10px;">
+                    <a href="/api/ca/download?format=crt" class="btn-primary" style="flex:1; text-align:center; text-decoration:none;">📥 Download Android CA (.crt)</a>
+                    <a href="/api/ca/download?format=mobileconfig" class="btn-primary" style="flex:1; text-align:center; text-decoration:none;">📱 Download iOS Profile (.mobileconfig)</a>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeAllModals()">Close</button>
+            </div>
+        </div>
+    </div>
 
     <script src="app.js"></script>
 </body>

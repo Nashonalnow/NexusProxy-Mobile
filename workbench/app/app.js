@@ -207,6 +207,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 scopeAllowlistInput.value = data.scope.join("\n");
                 statScopeCount.textContent = data.scope.length;
             }
+            if (data.listen_port) {
+                const portElem = document.getElementById("statListenPort");
+                if (portElem) portElem.textContent = data.listen_port;
+            }
+            if (data.ca_fingerprint) {
+                const fpElem = document.getElementById("dashboardCaFingerprint");
+                if (fpElem) fpElem.textContent = data.ca_fingerprint;
+            }
         } catch (e) {
             console.warn("Scope load error:", e);
         }
@@ -508,9 +516,371 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // =========================================================================
+    // 11. Interactive Dashboard Modals & Scope Inspection
+    // =========================================================================
+    const modalCapturedTraffic = document.getElementById("modalCapturedTraffic");
+    const modalProxySocket = document.getElementById("modalProxySocket");
+    const modalScopeGuard = document.getElementById("modalScopeGuard");
+    const modalCaCertificate = document.getElementById("modalCaCertificate");
+
+    const cardCapturedRequests = document.getElementById("cardCapturedRequests");
+    const cardProxyPort = document.getElementById("cardProxyPort");
+    const cardScopeDomains = document.getElementById("cardScopeDomains");
+    const btnOpenCaModal = document.getElementById("btnOpenCaModal");
+
+    window.closeAllModals = function() {
+        document.querySelectorAll(".tactical-modal").forEach(m => m.classList.add("hidden"));
+    };
+
+    window.openModal = function(modal) {
+        closeAllModals();
+        if (modal) modal.classList.remove("hidden");
+    };
+
+    // Close on Escape key
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeAllModals();
+    });
+
+    // 11.A Card 1: Captured Traffic Inspector
+    if (cardCapturedRequests) {
+        cardCapturedRequests.addEventListener("click", async () => {
+            openModal(modalCapturedTraffic);
+            await refreshTrafficStatsModal();
+        });
+    }
+
+    async function refreshTrafficStatsModal() {
+        try {
+            const res = await fetch("/api/traffic/stats");
+            const data = await res.json();
+
+            document.getElementById("modalTrafficTotal").textContent = data.total_captured;
+            document.getElementById("modalTrafficAvgLatency").textContent = `${data.avg_latency_ms} ms`;
+            document.getElementById("modalTrafficSuccess").textContent = data.status_distribution["2xx"] || 0;
+            document.getElementById("modalTrafficErrors").textContent = (data.status_distribution["4xx"] || 0) + (data.status_distribution["5xx"] || 0);
+
+            // Methods row
+            const methodsContainer = document.getElementById("modalTrafficMethodsRow");
+            methodsContainer.innerHTML = Object.entries(data.methods || {}).map(([m, cnt]) => `
+                <span class="method-tag method-${m.toLowerCase()}" style="font-size:0.75rem; padding:3px 8px;">${m}: ${cnt}</span>
+            `).join("") || '<span style="color:#94a3b8; font-size:0.8rem;">No transactions recorded</span>';
+
+            // Top hosts row
+            const hostsContainer = document.getElementById("modalTrafficHostsRow");
+            hostsContainer.innerHTML = (data.top_hosts || []).map(([h, cnt]) => `
+                <span style="display:inline-block; margin-right:12px; margin-bottom:4px; color:#00d2ff;">${escapeHtml(h)} (${cnt})</span>
+            `).join("") || '<span>None</span>';
+
+            // Recent transactions
+            const recentContainer = document.getElementById("modalTrafficRecentList");
+            const recents = data.recent_transactions || [];
+            if (recents.length === 0) {
+                recentContainer.innerHTML = '<div style="color:#94a3b8; font-size:0.8rem; padding:8px 0;">No traffic captured yet.</div>';
+            } else {
+                recentContainer.innerHTML = recents.map(tx => `
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:#080d16; padding:6px 10px; border-radius:6px; font-size:0.78rem;">
+                        <div style="display:flex; gap:8px; align-items:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                            <span class="method-tag method-${tx.method.toLowerCase()}" style="font-size:0.68rem; padding:1px 5px;">${tx.method}</span>
+                            <span style="color:#00d2ff; font-family:monospace;">${escapeHtml(tx.host)}</span>
+                            <span style="color:#cbd5e1; font-family:monospace;">${escapeHtml(tx.path)}</span>
+                        </div>
+                        <div style="display:flex; gap:6px; align-items:center; flex-shrink:0;">
+                            <span class="score-badge grade-secure" style="font-size:0.68rem; padding:1px 6px;">${tx.status_code}</span>
+                            <span style="color:#94a3b8; font-family:monospace; font-size:0.72rem;">${tx.latency_ms}ms</span>
+                            <button class="btn-secondary" style="padding:2px 6px; font-size:0.68rem;" onclick="sendToRepeater('${tx.method}', 'https://${tx.host}${tx.path}', ''); closeAllModals();">🔁 Replay</button>
+                        </div>
+                    </div>
+                `).join("");
+            }
+        } catch (e) {
+            console.warn("Traffic stats error:", e);
+        }
+    }
+
+    // 11.B Card 2: Proxy Socket & Port Configuration
+    if (cardProxyPort) {
+        cardProxyPort.addEventListener("click", async () => {
+            openModal(modalProxySocket);
+            await refreshProxyConfigModal();
+        });
+    }
+
+    async function refreshProxyConfigModal() {
+        try {
+            const res = await fetch("/api/status");
+            const data = await res.json();
+            const isRunning = data.status === "OPERATIONAL";
+            const badge = document.getElementById("modalProxyStateBadge");
+            const btnToggle = document.getElementById("modalBtnToggleProxy");
+            const btnIntercept = document.getElementById("modalBtnToggleIntercept");
+
+            badge.textContent = isRunning ? "RUNNING" : "STOPPED";
+            badge.className = isRunning ? "score-badge grade-secure" : "score-badge";
+            if (!isRunning) {
+                badge.style.background = "rgba(239, 68, 68, 0.15)";
+                badge.style.color = "#ef4444";
+            }
+
+            btnToggle.textContent = isRunning ? "Pause Proxy Listener" : "Resume Proxy Listener";
+            btnToggle.className = isRunning ? "btn-danger" : "btn-primary";
+
+            btnIntercept.textContent = data.intercept_enabled ? "Intercept: ON" : "Intercept: OFF";
+            btnIntercept.className = data.intercept_enabled ? "btn-intercept-pill active" : "btn-secondary";
+
+            document.getElementById("modalProxyPortInput").value = data.listen_port;
+        } catch (e) {
+            console.warn("Proxy config modal refresh error:", e);
+        }
+    }
+
+    const modalBtnToggleProxy = document.getElementById("modalBtnToggleProxy");
+    if (modalBtnToggleProxy) {
+        modalBtnToggleProxy.addEventListener("click", async () => {
+            try {
+                const res = await fetch("/api/proxy/toggle", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+                const data = await res.json();
+                const proxyStatusBadge = document.getElementById("proxyStatusBadge");
+                proxyStatusBadge.textContent = data.is_running ? "RUNNING" : "STOPPED";
+                proxyStatusBadge.className = data.is_running ? "score-badge grade-secure" : "score-badge";
+                await refreshProxyConfigModal();
+            } catch (e) {
+                alert("Proxy toggle error: " + e.message);
+            }
+        });
+    }
+
+    const modalBtnToggleIntercept = document.getElementById("modalBtnToggleIntercept");
+    if (modalBtnToggleIntercept) {
+        modalBtnToggleIntercept.addEventListener("click", async () => {
+            btnToggleIntercept.click();
+            setTimeout(refreshProxyConfigModal, 100);
+        });
+    }
+
+    const modalBtnSaveProxyConfig = document.getElementById("modalBtnSaveProxyConfig");
+    if (modalBtnSaveProxyConfig) {
+        modalBtnSaveProxyConfig.addEventListener("click", async () => {
+            const port = parseInt(document.getElementById("modalProxyPortInput").value, 10);
+            const rpm = parseInt(document.getElementById("modalProxyRpmInput").value, 10);
+
+            if (isNaN(port) || port < 1024 || port > 65535) {
+                alert("Please specify a valid port between 1024 and 65535.");
+                return;
+            }
+
+            modalBtnSaveProxyConfig.disabled = true;
+            modalBtnSaveProxyConfig.textContent = "Applying...";
+
+            try {
+                const res = await fetch("/api/proxy/config", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ listen_port: port, rate_limit_rpm: rpm })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    document.getElementById("statListenPort").textContent = data.listen_port;
+                    alert(`✓ Proxy listener port updated to :${data.listen_port}!`);
+                } else {
+                    alert("Error: " + data.detail);
+                }
+            } catch (e) {
+                alert("Failed to update proxy port: " + e.message);
+            } finally {
+                modalBtnSaveProxyConfig.disabled = false;
+                modalBtnSaveProxyConfig.textContent = "Save & Apply";
+            }
+        });
+    }
+
+    // 11.C Card 3: Target Scope Guard & Live Scope Tester
+    if (cardScopeDomains) {
+        cardScopeDomains.addEventListener("click", async () => {
+            openModal(modalScopeGuard);
+            await refreshScopeModal();
+        });
+    }
+
+    async function refreshScopeModal() {
+        try {
+            const res = await fetch("/api/status");
+            const data = await res.json();
+            const allowList = data.scope || [];
+            document.getElementById("modalScopeAllowCountBadge").textContent = `${allowList.length} IN-SCOPE`;
+
+            const allowChips = document.getElementById("modalScopeAllowlistChips");
+            allowChips.innerHTML = allowList.map(dom => `
+                <span class="scope-chip">
+                    ${escapeHtml(dom)}
+                    <span style="cursor:pointer; margin-left:4px; opacity:0.7;" onclick="removeScopeDomain('${escapeJs(dom)}')">&times;</span>
+                </span>
+            `).join("") || '<span style="color:#94a3b8; font-size:0.8rem;">No allowlist rules defined</span>';
+
+            const denyChips = document.getElementById("modalScopeDenylistChips");
+            const denylist = ["*.apple.com", "*.google.com"];
+            denyChips.innerHTML = denylist.map(dom => `
+                <span class="scope-chip deny">${escapeHtml(dom)} (System Guard)</span>
+            `).join("");
+        } catch (e) {
+            console.warn("Scope modal refresh error:", e);
+        }
+    }
+
+    window.removeScopeDomain = async function(domain) {
+        const current = scopeAllowlistInput.value.split("\n").map(s => s.trim()).filter(s => s.length > 0 && s !== domain);
+        try {
+            const res = await fetch("/api/scope/update", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ allowlist: current })
+            });
+            const data = await res.json();
+            scopeAllowlistInput.value = data.allowlist.join("\n");
+            statScopeCount.textContent = data.allowlist.length;
+            await refreshScopeModal();
+        } catch (e) {
+            alert("Error removing domain: " + e.message);
+        }
+    };
+
+    const modalBtnAddDomain = document.getElementById("modalBtnAddDomain");
+    const modalScopeAddDomainInput = document.getElementById("modalScopeAddDomainInput");
+    if (modalBtnAddDomain && modalScopeAddDomainInput) {
+        modalBtnAddDomain.addEventListener("click", async () => {
+            const val = modalScopeAddDomainInput.value.trim();
+            if (!val) return;
+            const current = scopeAllowlistInput.value.split("\n").map(s => s.trim()).filter(s => s.length > 0);
+            if (!current.includes(val)) current.push(val);
+
+            try {
+                const res = await fetch("/api/scope/update", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ allowlist: current })
+                });
+                const data = await res.json();
+                scopeAllowlistInput.value = data.allowlist.join("\n");
+                statScopeCount.textContent = data.allowlist.length;
+                modalScopeAddDomainInput.value = "";
+                await refreshScopeModal();
+            } catch (e) {
+                alert("Error adding domain: " + e.message);
+            }
+        });
+    }
+
+    const modalBtnTestScope = document.getElementById("modalBtnTestScope");
+    const modalScopeTestInput = document.getElementById("modalScopeTestInput");
+    const modalScopeTestResult = document.getElementById("modalScopeTestResult");
+
+    if (modalBtnTestScope && modalScopeTestInput) {
+        modalBtnTestScope.addEventListener("click", async () => {
+            const host = modalScopeTestInput.value.trim();
+            if (!host) {
+                alert("Please enter a domain or hostname to test.");
+                return;
+            }
+
+            modalBtnTestScope.disabled = true;
+            modalBtnTestScope.textContent = "Testing...";
+
+            try {
+                const res = await fetch("/api/scope/test", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ host })
+                });
+                const data = await res.json();
+                modalScopeTestResult.style.display = "block";
+
+                if (data.in_scope) {
+                    modalScopeTestResult.style.background = "rgba(0, 245, 155, 0.12)";
+                    modalScopeTestResult.style.border = "1px solid #00f59b";
+                    modalScopeTestResult.style.color = "#00f59b";
+                    modalScopeTestResult.innerHTML = `
+                        <strong>✓ IN-SCOPE TARGET:</strong> ${escapeHtml(data.host)}<br>
+                        <span style="font-size:0.75rem; color:#cbd5e1;">Rule Matched: <code>${escapeHtml(data.matched_pattern)}</code> (${data.action})</span>
+                    `;
+                } else {
+                    modalScopeTestResult.style.background = "rgba(239, 68, 68, 0.12)";
+                    modalScopeTestResult.style.border = "1px solid #ef4444";
+                    modalScopeTestResult.style.color = "#ef4444";
+                    modalScopeTestResult.innerHTML = `
+                        <strong>❌ OUT-OF-SCOPE BOUNDARY:</strong> ${escapeHtml(data.host)}<br>
+                        <span style="font-size:0.75rem; color:#fca5a5;">Boundary Rule: <code>${escapeHtml(data.matched_pattern)}</code> (${data.action})</span>
+                    `;
+                }
+            } catch (e) {
+                modalScopeTestResult.style.display = "block";
+                modalScopeTestResult.style.color = "#ef4444";
+                modalScopeTestResult.textContent = "Scope test error: " + e.message;
+            } finally {
+                modalBtnTestScope.disabled = false;
+                modalBtnTestScope.textContent = "⚡ Test Domain";
+            }
+        });
+    }
+
+    // 11.D Card 4: Root CA Inspector & Device Onboarding Guide
+    if (btnOpenCaModal) {
+        btnOpenCaModal.addEventListener("click", async () => {
+            openModal(modalCaCertificate);
+            await refreshCaModal();
+        });
+    }
+
+    async function refreshCaModal() {
+        try {
+            const res = await fetch("/api/ca/details");
+            const data = await res.json();
+            const fpElem = document.getElementById("modalCaFingerprintFull");
+            if (fpElem) fpElem.textContent = data.fingerprint_sha256 || "UNAVAILABLE";
+            const dashFp = document.getElementById("dashboardCaFingerprint");
+            if (dashFp) dashFp.textContent = data.fingerprint_sha256 || "UNAVAILABLE";
+        } catch (e) {
+            console.warn("CA details error:", e);
+        }
+    }
+
+    const modalBtnCopyFp = document.getElementById("modalBtnCopyFp");
+    if (modalBtnCopyFp) {
+        modalBtnCopyFp.addEventListener("click", () => {
+            const fp = document.getElementById("modalCaFingerprintFull").textContent;
+            navigator.clipboard.writeText(fp).then(() => {
+                modalBtnCopyFp.textContent = "✓ Copied!";
+                setTimeout(() => { modalBtnCopyFp.textContent = "📋 Copy"; }, 2000);
+            });
+        });
+    }
+
+    const modalBtnTabAndroidGuide = document.getElementById("modalBtnTabAndroidGuide");
+    const modalBtnTabIosGuide = document.getElementById("modalBtnTabIosGuide");
+    const modalGuideAndroid = document.getElementById("modalGuideAndroid");
+    const modalGuideIos = document.getElementById("modalGuideIos");
+
+    if (modalBtnTabAndroidGuide && modalBtnTabIosGuide) {
+        modalBtnTabAndroidGuide.addEventListener("click", () => {
+            modalBtnTabAndroidGuide.classList.add("active");
+            modalBtnTabIosGuide.classList.remove("active");
+            modalGuideAndroid.style.display = "block";
+            modalGuideIos.style.display = "none";
+        });
+
+        modalBtnTabIosGuide.addEventListener("click", () => {
+            modalBtnTabIosGuide.classList.add("active");
+            modalBtnTabAndroidGuide.classList.remove("active");
+            modalGuideAndroid.style.display = "none";
+            modalGuideIos.style.display = "block";
+        });
+    }
+
     // Initial load
     loadHistory();
     loadScope();
     loadPassiveAudit();
+    refreshCaModal();
 });
+
 

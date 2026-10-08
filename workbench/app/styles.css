@@ -712,3 +712,188 @@ body {
     overflow-x: auto;
 }
 
+/* Interactive Stat Cards */
+.interactive-stat-card {
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s, border-color 0.2s;
+    user-select: none;
+}
+
+.interactive-stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 245, 155, 0.12);
+    border-color: rgba(0, 245, 155, 0.4);
+}
+
+.interactive-stat-card:active {
+    transform: translateY(-1px);
+}
+
+#cardProxyPort.interactive-stat-card:hover {
+    box-shadow: 0 8px 24px rgba(0, 210, 255, 0.15);
+    border-color: rgba(0, 210, 255, 0.4);
+}
+
+#cardScopeDomains.interactive-stat-card:hover {
+    box-shadow: 0 8px 24px rgba(245, 158, 11, 0.15);
+    border-color: rgba(245, 158, 11, 0.4);
+}
+
+.stat-action-hint {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--accent-emerald);
+    margin-top: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0.85;
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.interactive-stat-card:hover .stat-action-hint {
+    opacity: 1;
+    transform: translateX(2px);
+}
+
+.stat-icon-badge {
+    font-size: 1.15rem;
+    opacity: 0.85;
+}
+
+.interactive-ca-card {
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.interactive-ca-card:hover {
+    border-color: rgba(0, 210, 255, 0.4);
+    box-shadow: 0 4px 20px rgba(0, 210, 255, 0.08);
+}
+
+/* Tactical Modals */
+.tactical-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 16px;
+}
+
+.tactical-modal.hidden {
+    display: none;
+}
+
+.modal-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(3, 7, 14, 0.82);
+    backdrop-filter: blur(6px);
+}
+
+.modal-dialog {
+    position: relative;
+    background: #0c1322;
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    max-width: 650px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 16px 50px rgba(0, 0, 0, 0.8);
+    animation: modalSlideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 2;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: scale(0.96) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--card-border);
+    background: #090e18;
+    border-radius: 16px 16px 0 0;
+}
+
+.modal-title {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #f8fafc;
+}
+
+.modal-close-btn {
+    background: none;
+    border: none;
+    font-size: 1.6rem;
+    color: #94a3b8;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 4px;
+    transition: color 0.15s;
+}
+
+.modal-close-btn:hover {
+    color: #f8fafc;
+}
+
+.modal-body {
+    padding: 18px 20px;
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--card-border);
+    background: #080d18;
+    border-radius: 0 0 16px 16px;
+}
+
+/* Scope Chips */
+.scope-chip {
+    font-family: monospace;
+    font-size: 0.78rem;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: rgba(0, 245, 155, 0.1);
+    border: 1px solid rgba(0, 245, 155, 0.3);
+    color: #00f59b;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.scope-chip.deny {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+}
+
+

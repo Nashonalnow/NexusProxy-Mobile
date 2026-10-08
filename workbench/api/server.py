@@ -264,6 +264,142 @@ def update_scope(req: ScopeUpdateRequest):
         "rate_limit_rpm": proxy_state["rate_limit_rpm"]
     }
 
+# Interactive Traffic Statistics Engine
+@app.get("/api/traffic/stats")
+def get_traffic_stats():
+    methods = {}
+    statuses = {"2xx": 0, "3xx": 0, "4xx": 0, "5xx": 0, "other": 0}
+    hosts = {}
+    total_latency = 0
+
+    for t in traffic_history:
+        m = t.get("method", "GET").upper()
+        methods[m] = methods.get(m, 0) + 1
+
+        sc = t.get("status_code", 200)
+        if 200 <= sc < 300:
+            statuses["2xx"] += 1
+        elif 300 <= sc < 400:
+            statuses["3xx"] += 1
+        elif 400 <= sc < 500:
+            statuses["4xx"] += 1
+        elif 500 <= sc < 600:
+            statuses["5xx"] += 1
+        else:
+            statuses["other"] += 1
+
+        h = t.get("host", "unknown")
+        hosts[h] = hosts.get(h, 0) + 1
+        total_latency += t.get("latency_ms", 0)
+
+    avg_latency = round(total_latency / len(traffic_history), 1) if traffic_history else 0
+
+    recent = []
+    for t in reversed(traffic_history[-6:]):
+        recent.append({
+            "id": t["id"],
+            "method": t["method"],
+            "host": t["host"],
+            "path": t["path"],
+            "status_code": t["status_code"],
+            "latency_ms": t["latency_ms"],
+            "timestamp": t["timestamp"]
+        })
+
+    return {
+        "total_captured": len(traffic_history),
+        "methods": methods,
+        "status_distribution": statuses,
+        "top_hosts": sorted(hosts.items(), key=lambda x: x[1], reverse=True)[:5],
+        "avg_latency_ms": avg_latency,
+        "recent_transactions": recent
+    }
+
+# Interactive Proxy Socket Configuration
+class ProxyConfigRequest(BaseModel):
+    listen_port: Optional[int] = None
+    rate_limit_rpm: Optional[int] = None
+    is_running: Optional[bool] = None
+    intercept_enabled: Optional[bool] = None
+
+@app.post("/api/proxy/config")
+def update_proxy_config(req: ProxyConfigRequest):
+    if req.listen_port is not None:
+        if not (1024 <= req.listen_port <= 65535):
+            raise HTTPException(status_code=400, detail="Port must be between 1024 and 65535")
+        proxy_state["listen_port"] = req.listen_port
+    if req.rate_limit_rpm is not None:
+        proxy_state["rate_limit_rpm"] = req.rate_limit_rpm
+    if req.is_running is not None:
+        proxy_state["is_running"] = req.is_running
+    if req.intercept_enabled is not None:
+        proxy_state["intercept_enabled"] = req.intercept_enabled
+
+    return {
+        "status": "SUCCESS",
+        "listen_port": proxy_state["listen_port"],
+        "rate_limit_rpm": proxy_state["rate_limit_rpm"],
+        "is_running": proxy_state["is_running"],
+        "intercept_enabled": proxy_state["intercept_enabled"]
+    }
+
+# Interactive Domain Scope Tester
+class ScopeTestRequest(BaseModel):
+    host: str
+
+@app.post("/api/scope/test")
+def test_scope_host(req: ScopeTestRequest):
+    host = req.host.strip().lower()
+    if not host:
+        raise HTTPException(status_code=400, detail="Host cannot be empty")
+
+    # Check denylist first
+    for denypat in proxy_state.get("scope_denylist", []):
+        dpat = denypat.lower().strip()
+        if dpat == host or (dpat.startswith("*.") and (host == dpat[2:] or host.endswith("." + dpat[2:]))):
+            return {
+                "host": host,
+                "in_scope": False,
+                "matched_pattern": dpat,
+                "action": "DENIED (Explicit Denylist Boundary)"
+            }
+
+    # Check allowlist
+    in_scope = False
+    matched_pat = None
+    for allowpat in proxy_state.get("scope_allowlist", []):
+        apat = allowpat.lower().strip()
+        if apat == "*" or apat == host or (apat.startswith("*.") and (host == apat[2:] or host.endswith("." + apat[2:]))):
+            in_scope = True
+            matched_pat = apat
+            break
+
+    # Also test via native Rust policy engine
+    if native_core and not in_scope:
+        if native_core.is_host_in_scope(host):
+            in_scope = True
+            matched_pat = "native_policy_match"
+
+    return {
+        "host": host,
+        "in_scope": in_scope,
+        "matched_pattern": matched_pat or "None",
+        "action": "ALLOWED (In-Scope Target)" if in_scope else "BLOCKED (Out-of-Scope)"
+    }
+
+# CA Certificate Details & Fingerprint
+@app.get("/api/ca/details")
+def get_ca_details():
+    pem = native_core.export_ca_pem() if native_core else ""
+    fp = native_core.get_ca_fingerprint() if native_core else ""
+    return {
+        "common_name": "NexusProxy Root CA",
+        "organization": "NexusProxy Security",
+        "fingerprint_sha256": fp,
+        "validity": "3 Years (Dynamic Local Authority)",
+        "pem": pem
+    }
+
 @app.post("/api/evidence/export")
 def export_evidence_bundle():
     """Generates signed engagement.zip evidence bundle with SHA-256 manifests."""

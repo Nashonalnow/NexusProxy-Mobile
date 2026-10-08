@@ -1,0 +1,81 @@
+# NexusProxy Mobile Git Ignore Rules
+
+# OS Metadata
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE & Editor Files
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# Rust & Cargo
+target/
+**/*.rs.bk
+Cargo.lock
+
+# Android Build & Gradle
+android/.gradle/
+android/local.properties
+android/**/build/
+android/captures/
+android/.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Kotlin
+out/
+bin/
+
+# iOS & Swift & Xcode
+ios/.build/
+ios/DerivedData/
+ios/**/xcuserdata/
+ios/**/xcshareddata/swiftpm/
+ios/**/*.xcworkspace/xcuserdata/
+ios/**/*.xcodeproj/xcuserdata/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Cryptographic Keys & Secrets (Zero Leakage)
+.env
+.env.*
+*.key
+*.pem
+*.crt
+*.cer
+*.p12
+*.jks
+*.keystore
+
+# Database & SQLite Storage
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+
+# Execution Logs & Runtime Dumps
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Test Reports & Captures
+reports/
+artifacts/
+coverage/
+*.pcap
+*.pcapng
+*.har

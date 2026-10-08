@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#070b12">
+    <title>NexusProxy Mobile™ | Web Security Testing Workbench</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Top Status Bar -->
+        <header class="app-header">
+            <div class="header-left">
+                <span id="proxyPing" class="status-pulse active"></span>
+                <span class="app-brand">NexusProxy<span class="brand-accent">™</span></span>
+                <span class="badge-version">v0.1.0</span>
+            </div>
+            <div class="header-right">
+                <button id="btnToggleIntercept" class="btn-intercept-pill">INTERCEPT: OFF</button>
+                <span id="proxyStatusBadge" class="score-badge grade-secure">RUNNING</span>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="nav-tabs-wrapper">
+            <div class="nav-tabs">
+                <button class="nav-btn active" data-tab="tab-dashboard">🎯 Dashboard</button>
+                <button class="nav-btn" data-tab="tab-intercept">⏸️ Intercept</button>
+                <button class="nav-btn" data-tab="tab-history">📜 HTTP History</button>
+                <button class="nav-btn" data-tab="tab-repeater">🔁 Repeater</button>
+                <button class="nav-btn" data-tab="tab-scope">🛡️ Scope Guard</button>
+                <button class="nav-btn" data-tab="tab-export">📦 Evidence Export</button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+
+            <!-- TAB 1: Dashboard -->
+            <section id="tab-dashboard" class="tab-pane active">
+                <div class="pane-header">
+                    <div>
+                        <h2>Mobile Security Testing Workbench</h2>
+                        <p class="pane-sub">Original on-device proxy, repeater, and forensic evidence collection platform.</p>
+                    </div>
+                </div>
+
+                <div class="summary-cards-row">
+                    <div class="stat-card">
+                        <span class="stat-num" id="statCaptured">2</span>
+                        <span class="stat-lbl">Captured Requests</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-num" id="statListenPort">8085</span>
+                        <span class="stat-lbl">Proxy Port</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-num" id="statScopeCount">3</span>
+                        <span class="stat-lbl">In-Scope Domains</span>
+                    </div>
+                </div>
+
+                <div class="tactical-card">
+                    <div class="card-header">
+                        <h3>Quick Workflow Launchers</h3>
+                    </div>
+                    <div class="btn-grid">
+                        <button class="btn-quick" onclick="switchTab('tab-repeater')">🔁 Open Repeater</button>
+                        <button class="btn-quick" onclick="switchTab('tab-history')">📜 Inspect HTTP History</button>
+                        <button class="btn-quick" onclick="switchTab('tab-scope')">🛡️ Configure Target Scope</button>
+                        <button class="btn-quick" onclick="switchTab('tab-export')">📦 Export Evidence ZIP</button>
+                    </div>
+                </div>
+
+                <div class="tactical-card" style="margin-top:16px;">
+                    <div class="card-header">
+                        <h3>Testing Root CA Onboarding</h3>
+                        <span class="score-badge grade-secure">ACTIVE</span>
+                    </div>
+                    <p class="pane-sub">Install the testing Root CA into Android User Credentials or iOS Configuration Profile.</p>
+                    <div class="btn-row" style="margin-top:12px;">
+                        <button class="btn-secondary" id="btnDownloadCaCrt">📥 Download Android CA (.crt)</button>
+                        <button class="btn-secondary" id="btnDownloadIosProfile">📱 Download iOS Profile (.mobileconfig)</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: Intercept -->
+            <section id="tab-intercept" class="tab-pane">
+                <div class="pane-header">
+                    <div>
+                        <h2>Live Request Intercept</h2>
+                        <p class="pane-sub">Pause in-flight requests, edit headers or bodies in real time, and forward or drop.</p>
+                    </div>
+                    <div class="btn-row">
+                        <button id="btnForwardIntercept" class="btn-primary" disabled>Forward ⏩</button>
+                        <button id="btnDropIntercept" class="btn-danger" disabled>Drop ❌</button>
+                    </div>
+                </div>
+
+                <div class="editor-container">
+                    <textarea id="interceptEditor" class="code-editor" placeholder="No pending intercepted requests. Toggle 'INTERCEPT: ON' to capture traffic."></textarea>
+                </div>
+            </section>
+
+            <!-- TAB 3: HTTP History -->
+            <section id="tab-history" class="tab-pane">
+                <div class="pane-header">
+                    <div>
+                        <h2>HTTP/S Traffic History</h2>
+                        <p class="pane-sub">Chronological audit log of all intercepted transactions with SHA-256 seal.</p>
+                    </div>
+                    <input type="text" id="historySearchInput" placeholder="Filter by host, path, or method..." class="search-input" />
+                </div>
+
+                <div class="history-table-container">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Method</th>
+                                <th>Host</th>
+                                <th>Path</th>
+                                <th>Status</th>
+                                <th>Latency</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody">
+                            <!-- Populated via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- TAB 4: Repeater -->
+            <section id="tab-repeater" class="tab-pane">
+                <div class="pane-header">
+                    <div>
+                        <h2>Request Repeater & Replay Engine</h2>
+                        <p class="pane-sub">Modify raw HTTP requests and dispatch them across isolated sockets.</p>
+                    </div>
+                    <button id="btnSendReplay" class="btn-primary">⚡ Send Request</button>
+                </div>
+
+                <div class="repeater-url-bar">
+                    <select id="repeaterMethod" class="method-select">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                        <option value="PATCH">PATCH</option>
+                    </select>
+                    <input type="text" id="repeaterUrl" class="url-input" value="https://httpbin.org/get" placeholder="https://target.com/endpoint" />
+                </div>
+
+                <div class="split-pane">
+                    <!-- Request Pane -->
+                    <div class="pane-box">
+                        <div class="pane-box-header">
+                            <span>Request Headers & Body</span>
+                        </div>
+                        <textarea id="repeaterRequestText" class="code-editor" spellcheck="false">User-Agent: NexusProxy-Mobile/0.1.0
+Accept: application/json
+Content-Type: application/json</textarea>
+                    </div>
+
+                    <!-- Response Pane -->
+                    <div class="pane-box">
+                        <div class="pane-box-header">
+                            <span>Response Telemetry</span>
+                            <span id="responseStatusPill" class="score-badge grade-secure">STATUS: --</span>
+                            <span id="responseLatencyPill" class="latency-badge">-- ms</span>
+                        </div>
+                        <pre id="repeaterResponseText" class="code-editor response-viewer">Awaiting request dispatch. Tap "Send Request" to replay.</pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 5: Scope Guard -->
+            <section id="tab-scope" class="tab-pane">
+                <div class="pane-header">
+                    <div>
+                        <h2>Scope Policy & Boundaries</h2>
+                        <p class="pane-sub">Enforces strict legal assessment boundaries. Out-of-scope targets are dropped.</p>
+                    </div>
+                    <button id="btnSaveScope" class="btn-primary">Save Scope</button>
+                </div>
+
+                <div class="tactical-card">
+                    <h3>Authorized In-Scope Domains (Allowlist)</h3>
+                    <p class="pane-sub">Supports wildcard matching (e.g. <code>*.target.com</code>, <code>api.target.com</code>).</p>
+                    <textarea id="scopeAllowlistInput" class="code-editor" style="height:120px; margin-top:8px;" placeholder="*.target.com&#10;api.target.com&#10;httpbin.org"></textarea>
+                </div>
+
+                <div class="tactical-card" style="margin-top:16px;">
+                    <h3>Excluded Domains (Denylist)</h3>
+                    <textarea id="scopeDenylistInput" class="code-editor" style="height:80px; margin-top:8px;" placeholder="*.apple.com&#10;*.google.com"></textarea>
+                </div>
+            </section>
+
+            <!-- TAB 6: Evidence Export -->
+            <section id="tab-export" class="tab-pane">
+                <div class="pane-header">
+                    <div>
+                        <h2>Court-Admissible Evidence Dossier</h2>
+                        <p class="pane-sub">Generates signed engagement.zip archive with per-request SHA-256 manifests.</p>
+                    </div>
+                    <button id="btnExportZip" class="btn-primary">📦 Export Evidence ZIP</button>
+                </div>
+
+                <div class="tactical-card" id="exportCard">
+                    <h3>Export Status</h3>
+                    <div id="exportResult" class="digest-code" style="margin-top:10px;">
+                        Click "Export Evidence ZIP" to compile all captured requests, responses, and cryptographic seals.
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Mobile Pentest Copilot Floating Button -->
+    <button id="btnOpenCopilot" class="btn-copilot-hud" type="button" title="Consult Mobile Pentest Copilot">
+        <span class="copilot-pulse"></span>
+        <span class="copilot-hud-icon">🤖</span>
+        <span class="copilot-hud-text">Copilot</span>
+    </button>
+
+    <!-- Mobile Pentest Copilot Drawer -->
+    <aside id="copilotDrawer" class="copilot-drawer hidden">
+        <div class="copilot-drawer-header">
+            <div class="copilot-header-brand">
+                <span class="copilot-avatar">🤖</span>
+                <div>
+                    <h3 class="copilot-drawer-title">Mobile Pentest Copilot™</h3>
+                    <span class="copilot-drawer-role">Web Security & Traffic Specialist</span>
+                </div>
+            </div>
+            <button id="btnCloseCopilot" class="copilot-close-btn">&times;</button>
+        </div>
+
+        <div class="copilot-chips-container">
+            <button class="copilot-chip" data-prompt="Analyze captured HTTP traffic for OWASP Top 10 vulnerabilities">⚡ Analyze Traffic</button>
+            <button class="copilot-chip" data-prompt="Audit API requests against OWASP MASVS-NETWORK">🛡️ MASVS-NETWORK</button>
+            <button class="copilot-chip" data-prompt="Suggest Repeater test payloads for authentication bypass">🔁 Test Payloads</button>
+            <button class="copilot-chip" data-prompt="Generate feature blueprint for WebSocket interception">📐 Blueprint</button>
+        </div>
+
+        <div id="copilotChatStream" class="copilot-chat-stream">
+            <div class="copilot-msg bot-msg">
+                <div class="msg-header">🤖 Mobile Pentest Copilot</div>
+                <div class="msg-body">
+                    Ready. Connected to NexusProxy Mobile core.
+                    Ask me to analyze HTTP history, review target endpoints, suggest test payloads, or verify OWASP MASVS controls.
+                </div>
+            </div>
+        </div>
+
+        <div class="copilot-input-container">
+            <input type="text" id="copilotInput" placeholder="Ask Copilot about traffic, MASVS, or test payloads..." />
+            <button id="btnSendCopilot" class="btn-primary">Send</button>
+        </div>
+    </aside>
+
+    <script src="app.js"></script>
+</body>
+</html>

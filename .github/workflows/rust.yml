@@ -1,0 +1,41 @@
+name: Rust Core Engine CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'core/**'
+      - '.github/workflows/rust.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'core/**'
+
+jobs:
+  build-and-test:
+    name: Build & Test (Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+
+      - name: Check Formatting
+        working-directory: core
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy Linter
+        working-directory: core
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Run Unit Tests
+        working-directory: core
+        run: cargo test --all

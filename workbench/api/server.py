@@ -28,10 +28,19 @@ except ImportError:
     except Exception:
         native_core = None
 
+# Import Authentic CA Engine
+try:
+    from ca_engine import ca_engine
+except ImportError:
+    try:
+        from workbench.api.ca_engine import ca_engine
+    except Exception:
+        ca_engine = None
+
 from fastapi import FastAPI, HTTPException, Body, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 
 app = FastAPI(
@@ -105,7 +114,9 @@ class ReplayRequest(BaseModel):
 
 @app.get("/api/status")
 def get_status():
-    ca_fp = native_core.get_ca_fingerprint() if native_core else "UNAVAILABLE"
+    ca_fp = ca_engine.get_fingerprint_sha256() if ca_engine else (
+        native_core.get_ca_fingerprint() if native_core else "UNAVAILABLE"
+    )
     return {
         "status": "OPERATIONAL" if proxy_state["is_running"] else "STOPPED",
         "version": "0.2.0",
@@ -398,13 +409,15 @@ def test_scope_host(req: ScopeTestRequest):
 # CA Certificate Details & Fingerprint
 @app.get("/api/ca/details")
 def get_ca_details():
+    if ca_engine:
+        return ca_engine.get_details()
     pem = native_core.export_ca_pem() if native_core else ""
     fp = native_core.get_ca_fingerprint() if native_core else ""
     return {
-        "common_name": "NexusProxy Root CA",
-        "organization": "NexusProxy Security",
+        "common_name": "NexusProxy Testing Root CA",
+        "organization": "NexusProxy Mobile Security",
         "fingerprint_sha256": fp,
-        "validity": "3 Years (Dynamic Local Authority)",
+        "validity": "5 Years (Authentic Local Authority)",
         "pem": pem
     }
 
@@ -441,47 +454,40 @@ def export_evidence_bundle():
         "sha256": hashlib.sha256(bundle_path.read_bytes()).hexdigest()
     }
 
-# CA Download Endpoints (Dynamically generated via Rust rcgen Core)
+# CA Download Endpoints (Authentic RFC 5280 X.509 Root CA & Apple Configuration Profile)
 @app.get("/api/ca/download")
-def download_ca(format: str = Query("crt", pattern="^(crt|mobileconfig|pem)$")):
+def download_ca(format: str = Query("crt", pattern="^(crt|der|mobileconfig|pem)$")):
     if format == "mobileconfig":
-        content = native_core.export_mobileconfig() if native_core else ""
-        if not content:
-            content = """<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>PayloadDisplayName</key>
-    <string>NexusProxy Testing Root CA</string>
-    <key>PayloadIdentifier</key>
-    <string>com.nexusproxy.mobile.ca</string>
-    <key>PayloadType</key>
-    <string>Configuration</string>
-    <key>PayloadUUID</key>
-    <string>4A27B08C-F51D-4C9D-98C3-289196E752F3</string>
-    <key>PayloadVersion</key>
-    <integer>1</integer>
-</dict>
-</plist>"""
-        return JSONResponse(
-            content={"profile": content},
-            headers={"Content-Disposition": "attachment; filename=nexusproxy-ca.mobileconfig"}
+        content = ca_engine.get_mobileconfig_xml() if ca_engine else (
+            native_core.export_mobileconfig() if native_core else ""
         )
-
-    pem = native_core.export_ca_pem() if native_core else ""
-    if not pem:
-        pem = (
-            "-----BEGIN CERTIFICATE-----\n"
-            "MIIB/zCCAaWgAwIBAgIUKTAxNexusProxyRootCA==\n"
-            "CN: NexusProxy Root CA\n"
-            "O: NexusProxy Mobile Security\n"
-            "Validity: 2026-10-08 to 2029-10-08\n"
-            "-----END CERTIFICATE-----\n"
+        return Response(
+            content=content.encode("utf-8") if isinstance(content, str) else content,
+            media_type="application/x-apple-aspen-config",
+            headers={
+                "Content-Disposition": 'attachment; filename="nexusproxy-ca.mobileconfig"'
+            }
         )
-    return JSONResponse(
-        content={"certificate": pem},
-        headers={"Content-Disposition": "attachment; filename=nexusproxy-ca.crt"}
-    )
+    elif format == "der":
+        content = ca_engine.get_der_certificate() if ca_engine else b""
+        return Response(
+            content=content,
+            media_type="application/x-x509-ca-cert",
+            headers={
+                "Content-Disposition": 'attachment; filename="nexusproxy-ca.der"'
+            }
+        )
+    else:  # crt or pem
+        pem = ca_engine.get_pem_certificate() if ca_engine else (
+            native_core.export_ca_pem() if native_core else ""
+        )
+        return Response(
+            content=pem.encode("utf-8") if isinstance(pem, str) else pem,
+            media_type="application/x-x509-ca-cert",
+            headers={
+                "Content-Disposition": 'attachment; filename="nexusproxy-ca.crt"'
+            }
+        )
 
 # Passive Security Analysis (OWASP MASVS Heuristics via Rust Engine)
 @app.get("/api/audit/passive")

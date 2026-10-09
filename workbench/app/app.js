@@ -851,6 +851,14 @@ document.addEventListener("DOMContentLoaded", () => {
             if (fpElem) fpElem.textContent = data.fingerprint_sha256 || "UNAVAILABLE";
             const dashFp = document.getElementById("dashboardCaFingerprint");
             if (dashFp) dashFp.textContent = data.fingerprint_sha256 || "UNAVAILABLE";
+            const subjElem = document.getElementById("modalCaSubject");
+            if (subjElem && data.common_name) subjElem.textContent = data.common_name;
+            const orgElem = document.getElementById("modalCaOrg");
+            if (orgElem && data.organization) orgElem.textContent = data.organization;
+            const valElem = document.getElementById("modalCaValidity");
+            if (valElem && data.validity) valElem.textContent = data.validity;
+            const algoElem = document.getElementById("modalCaAlgo");
+            if (algoElem && data.key_algorithm) algoElem.textContent = `${data.key_algorithm} / ${data.signature_hash_algorithm || 'SHA-256'} (RFC 5280)`;
         } catch (e) {
             console.warn("CA details error:", e);
         }

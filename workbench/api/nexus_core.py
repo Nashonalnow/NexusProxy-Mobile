@@ -74,6 +74,13 @@ class NexusNativeCore:
         return self.lib.nexusproxy_is_host_in_scope(self.ctx, host.encode("utf-8"))
 
     def get_ca_fingerprint(self) -> str:
+        try:
+            from ca_engine import ca_engine
+            fp = ca_engine.get_fingerprint_sha256()
+            if fp and fp != "UNAVAILABLE":
+                return fp
+        except Exception:
+            pass
         if not self.lib or not self.ctx:
             return "N/A"
         ptr = self.lib.nexusproxy_get_ca_fingerprint(self.ctx)
@@ -84,6 +91,13 @@ class NexusNativeCore:
         return val
 
     def export_ca_pem(self) -> str:
+        try:
+            from ca_engine import ca_engine
+            pem = ca_engine.get_pem_certificate()
+            if pem:
+                return pem
+        except Exception:
+            pass
         if not self.lib or not self.ctx:
             return ""
         ptr = self.lib.nexusproxy_export_ca_pem(self.ctx)
@@ -94,6 +108,13 @@ class NexusNativeCore:
         return val
 
     def export_mobileconfig(self) -> str:
+        try:
+            from ca_engine import ca_engine
+            mc = ca_engine.get_mobileconfig_xml()
+            if mc:
+                return mc
+        except Exception:
+            pass
         if not self.lib or not self.ctx:
             return ""
         ptr = self.lib.nexusproxy_export_mobileconfig(self.ctx)

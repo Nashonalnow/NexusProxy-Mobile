@@ -55,9 +55,12 @@ ios/**/*.xcodeproj/xcuserdata/
 *.pem
 *.crt
 *.cer
+*.der
 *.p12
 *.jks
 *.keystore
+*.mobileconfig
+workbench/ca/
 
 # Database & SQLite Storage
 *.db

@@ -561,9 +561,10 @@ Content-Type: application/json</textarea>
                         <span class="score-badge grade-secure">AUTHENTIC</span>
                     </div>
                     <div style="font-size:0.8rem; color:#cbd5e1; display:flex; flex-direction:column; gap:4px;">
-                        <div><strong>Subject / CN:</strong> <code>NexusProxy Root CA</code></div>
-                        <div><strong>Organization:</strong> <code>NexusProxy Security</code></div>
-                        <div><strong>Validity:</strong> <code>3 Years (Dynamic Local Authority)</code></div>
+                        <div><strong>Subject / CN:</strong> <code id="modalCaSubject">NexusProxy Testing Root CA</code></div>
+                        <div><strong>Organization:</strong> <code id="modalCaOrg">NexusProxy Mobile Security</code></div>
+                        <div><strong>Validity:</strong> <code id="modalCaValidity">5 Years (Authentic Authority)</code></div>
+                        <div><strong>Algorithm:</strong> <code id="modalCaAlgo">RSA-2048 / SHA-256 (RFC 5280)</code></div>
                         <div style="margin-top:4px;">
                             <strong>SHA-256 Fingerprint:</strong>
                             <div style="display:flex; gap:6px; align-items:center; margin-top:2px;">
@@ -600,9 +601,10 @@ Content-Type: application/json</textarea>
                     </div>
                 </div>
 
-                <div class="btn-row" style="gap:10px;">
-                    <a href="/api/ca/download?format=crt" class="btn-primary" style="flex:1; text-align:center; text-decoration:none;">📥 Download Android CA (.crt)</a>
-                    <a href="/api/ca/download?format=mobileconfig" class="btn-primary" style="flex:1; text-align:center; text-decoration:none;">📱 Download iOS Profile (.mobileconfig)</a>
+                <div class="btn-row" style="gap:8px; flex-wrap:wrap;">
+                    <a href="/api/ca/download?format=crt" class="btn-primary" style="flex:1; min-width:160px; text-align:center; text-decoration:none;">📥 Android / Desktop (.crt)</a>
+                    <a href="/api/ca/download?format=der" class="btn-secondary" style="flex:1; min-width:160px; text-align:center; text-decoration:none;">📥 Android Keystore (.der)</a>
+                    <a href="/api/ca/download?format=mobileconfig" class="btn-primary" style="flex:1; min-width:160px; text-align:center; text-decoration:none;">📱 Apple iOS Profile (.mobileconfig)</a>
                 </div>
             </div>
             <div class="modal-footer">

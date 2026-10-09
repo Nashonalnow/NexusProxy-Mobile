@@ -155,13 +155,21 @@ def dispatch_replay(req: ReplayRequest):
 
     # Enforce scope check
     in_scope = False
-    for pat in proxy_state["scope_allowlist"]:
-        if pat == "*" or pat == host:
+    host_lower = host.lower()
+    for pat in proxy_state.get("scope_allowlist", []):
+        p = pat.lower().strip()
+        if p == "*" or p == host_lower:
             in_scope = True
             break
-        if pat.starts_with("*.") and (host == pat[2:] or host.endswith("." + pat[2:])):
+        if p.startswith("*.") and (host_lower == p[2:] or host_lower.endswith("." + p[2:])):
             in_scope = True
             break
+
+    if not in_scope and native_core:
+        try:
+            in_scope = native_core.is_host_in_scope(host_lower)
+        except Exception:
+            pass
 
     if not in_scope:
         raise HTTPException(

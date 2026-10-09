@@ -169,7 +169,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 })
             });
 
-            const data = await res.json();
+            let data;
+            const resText = await res.text();
+            try {
+                data = JSON.parse(resText);
+            } catch (jsonErr) {
+                responseStatusPill.className = "score-badge";
+                responseStatusPill.style.background = "rgba(239, 68, 68, 0.2)";
+                responseStatusPill.style.color = "#ef4444";
+                responseStatusPill.textContent = `HTTP ${res.status}`;
+                repeaterResponseText.textContent = `Server Response (${res.status}):\n${resText || jsonErr.message}`;
+                return;
+            }
+
             if (res.status === 403) {
                 responseStatusPill.className = "score-badge";
                 responseStatusPill.style.background = "rgba(239, 68, 68, 0.2)";

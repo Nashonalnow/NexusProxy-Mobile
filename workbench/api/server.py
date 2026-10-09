@@ -567,7 +567,32 @@ if APP_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(APP_DIR)), name="static_dir")
     app.mount("/", StaticFiles(directory=str(APP_DIR), html=True), name="static")
 
+@app.on_event("shutdown")
+def on_app_shutdown():
+    print("[Server] Graceful application shutdown triggered.")
+    if native_core and getattr(native_core, "lib", None) and getattr(native_core, "ctx", None):
+        try:
+            native_core.lib.nexusproxy_free(native_core.ctx)
+            native_core.ctx = None
+            print("[Server] Native Rust FFI context freed successfully.")
+        except Exception as e:
+            print(f"[Server] Note on freeing native core: {e}", file=sys.stderr)
+
 if __name__ == "__main__":
-    import uvicorn
+    try:
+        from port_manager import ensure_port_free, register_cleanup
+    except ImportError:
+        try:
+            from workbench.api.port_manager import ensure_port_free, register_cleanup
+        except Exception:
+            ensure_port_free = None
+            register_cleanup = None
+
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8095
-    uvicorn.run("server:app", host="0.0.0.0", port=port, reload=False)
+    if ensure_port_free:
+        ensure_port_free(port)
+        if register_cleanup:
+            register_cleanup(ports=[port])
+
+    import uvicorn
+    uvicorn.run("server:app", host="0.0.0.0", port=port, reload=False, timeout_graceful_shutdown=2)
